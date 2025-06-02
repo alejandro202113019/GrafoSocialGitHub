@@ -1,8 +1,34 @@
+# Dependencias principales
 streamlit>=1.28.0
 pandas>=1.5.0
 networkx>=2.8
 plotly>=5.15.0
 numpy>=1.21.0
-python-louvain>=0.16
 seaborn>=0.11.0
 matplotlib>=3.5.0
+
+# Dependencias de Machine Learning e IA
+scikit-learn>=1.3.0
+scipy>=1.9.0
+
+# Dependencias opcionales para algoritmos avanzados
+python-louvain>=0.16  # Para algoritmo Louvain (detección de comunidades)
+
+# Dependencias adicionales para análisis avanzado
+tqdm>=4.64.0  # Para barras de progreso
+joblib>=1.2.0  # Para paralelización
+
+# Dependencias para visualización avanzada
+plotly-express>=0.4.0
+kaleido>=0.2.1  # Para exportar gráficos
+
+# Dependencias de desarrollo (opcionales)
+pytest>=7.0.0
+jupyter>=1.0.0
+ipykernel>=6.15.0
+
+# Nota: Si python-louvain no está disponible, el sistema usará algoritmos alternativos
+# Para instalar python-louvain en algunos sistemas puede requerir:
+# pip install python-louvain
+# o
+# conda install -c conda-forge python-louvain
