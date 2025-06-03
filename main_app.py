@@ -64,6 +64,13 @@ st.markdown("""
         border-radius: 1rem;
         margin: 1rem 0;
     }
+    .comparison-section {
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border: 1px solid #dee2e6;
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -84,12 +91,13 @@ def main():
             "Selecciona una sección:",
             [
                 "📈 Resumen General", 
-                "🔍 Análisis de Red", 
+                "🔍 Análisis de Red Base", 
                 "👥 Comunidades IA", 
                 "🏆 Líderes Técnicos",
-                "🤖 Optimización IA",
+                "🤖 Optimización IA Completa",
                 "📊 Patrones Colaborativos",
-                "📋 Recomendaciones IA"
+                "📋 Recomendaciones IA",
+                "🔬 Análisis Comparativo Antes/Después"
             ]
         )
         
@@ -138,18 +146,20 @@ def main():
     # Mostrar sección seleccionada
     if section == "📈 Resumen General":
         show_general_overview(df, G, metrics)
-    elif section == "🔍 Análisis de Red":
-        show_network_analysis(G, metrics, visualizer)
+    elif section == "🔍 Análisis de Red Base":
+        show_base_network_analysis(G, metrics, visualizer, df)
     elif section == "👥 Comunidades IA":
         show_ai_community_analysis(G, ai_community_detector, df, community_method)
     elif section == "🏆 Líderes Técnicos":
-        show_technical_leaders(metrics, G, df)
-    elif section == "🤖 Optimización IA":
-        show_ai_optimization(ai_optimizer, optimization_level)
+        show_technical_leaders_classification(metrics, G, df, ai_optimizer)
+    elif section == "🤖 Optimización IA Completa":
+        show_complete_ai_optimization(ai_optimizer, G, df, visualizer)
     elif section == "📊 Patrones Colaborativos":
         show_collaboration_patterns(ai_optimizer)
     elif section == "📋 Recomendaciones IA":
         show_ai_recommendations(G, metrics, ai_optimizer, df)
+    elif section == "🔬 Análisis Comparativo Antes/Después":
+        show_before_after_analysis(G, df, ai_optimizer, visualizer)
 
 def create_network_graph(df):
     """Crear grafo de NetworkX desde el DataFrame"""
@@ -171,6 +181,725 @@ def create_network_graph(df):
             G.add_edge(source, target, weight=weight)
     
     return G
+
+def calculate_detailed_metrics(G):
+    """Calcula métricas detalladas del grafo"""
+    metrics = {}
+    
+    # Métricas básicas
+    metrics['num_nodes'] = G.number_of_nodes()
+    metrics['num_edges'] = G.number_of_edges()
+    metrics['density'] = nx.density(G)
+    
+    # Métricas de centralidad
+    metrics['pagerank'] = nx.pagerank(G, weight='weight')
+    metrics['betweenness_centrality'] = nx.betweenness_centrality(G, weight='weight')
+    metrics['degree_centrality'] = nx.degree_centrality(G)
+    metrics['closeness_centrality'] = nx.closeness_centrality(G, distance='weight')
+    
+    try:
+        metrics['eigenvector_centrality'] = nx.eigenvector_centrality(G, weight='weight', max_iter=1000)
+    except:
+        metrics['eigenvector_centrality'] = nx.eigenvector_centrality(G, max_iter=1000)
+    
+    # Métricas globales
+    undirected_G = G.to_undirected()
+    metrics['avg_clustering'] = nx.average_clustering(undirected_G, weight='weight')
+    metrics['num_components'] = nx.number_connected_components(undirected_G)
+    metrics['reciprocity'] = nx.reciprocity(G)
+    
+    if nx.is_connected(undirected_G):
+        metrics['diameter'] = nx.diameter(undirected_G)
+        metrics['avg_path_length'] = nx.average_shortest_path_length(undirected_G)
+    else:
+        metrics['diameter'] = float('inf')
+        metrics['avg_path_length'] = float('inf')
+    
+    return metrics
+
+def show_base_network_analysis(G, metrics, visualizer, df):
+    """Análisis de la Red de Colaboración Base según el taller"""
+    st.markdown('<h2 class="section-header">🔍 Análisis de la Red de Colaboración Base</h2>', unsafe_allow_html=True)
+    
+    # Métricas estructurales de la red base (Tabla del taller)
+    st.subheader("📊 Métricas Estructurales de la Red Base")
+    
+    # Calcular métricas específicas como en el taller
+    undirected_G = G.to_undirected()
+    
+    base_metrics = {
+        'Densidad de red': nx.density(G),
+        'Clustering promedio': nx.average_clustering(undirected_G, weight='weight'),
+        'Componentes conectados': nx.number_connected_components(undirected_G),
+        'Diámetro de red': nx.diameter(undirected_G) if nx.is_connected(undirected_G) else float('inf'),
+        'Reciprocidad': nx.reciprocity(G)
+    }
+    
+    # Crear tabla como en el taller
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("📊 Densidad de red", f"{base_metrics['Densidad de red']:.3f}")
+        st.write("*Red moderadamente conectada*")
+    
+    with col2:
+        st.metric("🕸️ Clustering promedio", f"{base_metrics['Clustering promedio']:.3f}")
+        st.write("*Alta tendencia a formación de grupos*")
+    
+    with col3:
+        st.metric("🔗 Componentes conectados", base_metrics['Componentes conectados'])
+        st.write("*Red completamente conectada*")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        diameter_val = base_metrics['Diámetro de red']
+        if diameter_val != float('inf'):
+            st.metric("📏 Diámetro de red", diameter_val)
+            st.write("*Comunicación eficiente*")
+        else:
+            st.metric("📏 Diámetro de red", "∞")
+            st.write("*Red desconectada*")
+    
+    with col2:
+        st.metric("🔄 Reciprocidad", f"{base_metrics['Reciprocidad']:.3f}")
+        st.write("*Alta colaboración bidireccional*")
+    
+    # Tabla de métricas estructurales como en el documento
+    st.subheader("📋 Cuadro 1: Métricas estructurales de la red base")
+    
+    metrics_df = pd.DataFrame([
+        {'Métrica': 'Densidad de red', 'Valor Inicial': f"{base_metrics['Densidad de red']:.3f}", 'Interpretación': 'Red moderadamente conectada'},
+        {'Métrica': 'Clustering promedio', 'Valor Inicial': f"{base_metrics['Clustering promedio']:.3f}", 'Interpretación': 'Alta tendencia a formación de grupos'},
+        {'Métrica': 'Componentes conectados', 'Valor Inicial': base_metrics['Componentes conectados'], 'Interpretación': 'Red completamente conectada'},
+        {'Métrica': 'Diámetro de red', 'Valor Inicial': base_metrics['Diámetro de red'] if base_metrics['Diámetro de red'] != float('inf') else '∞', 'Interpretación': 'Comunicación eficiente'},
+        {'Métrica': 'Reciprocidad', 'Valor Inicial': f"{base_metrics['Reciprocidad']:.3f}", 'Interpretación': 'Alta colaboración bidireccional'}
+    ])
+    
+    st.dataframe(metrics_df, use_container_width=True)
+    
+    # Información del dataset como en el taller
+    st.subheader("📈 Información del Dataset")
+    
+    developers = set(df['developer_source'].unique()) | set(df['developer_target'].unique())
+    repos = df['repo'].unique()
+    interactions = len(df)
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("👥 Desarrolladores", len(developers))
+    
+    with col2:
+        st.metric("📁 Repositorios principales", len(repos))
+    
+    with col3:
+        st.metric("🔄 Interacciones documentadas", interactions)
+    
+    with col4:
+        # Calcular período (aproximado)
+        if 'timestamp' in df.columns and not df['timestamp'].isna().all():
+            date_range = pd.to_datetime(df['timestamp']).max() - pd.to_datetime(df['timestamp']).min()
+            period = f"{date_range.days} días"
+        else:
+            period = "3 meses (estimado)"
+        st.metric("📅 Período", period)
+    
+    # Visualización de la red base
+    st.subheader("🕸️ Visualización de la Red Base")
+    
+    col1, col2 = st.columns([3, 1])
+    
+    with col2:
+        metric_option = st.selectbox(
+            "Métrica para colorear:",
+            ['pagerank', 'betweenness', 'closeness', 'eigenvector'],
+            key="base_metric"
+        )
+    
+    with col1:
+        fig = visualizer.create_network_plot(metrics, metric_option, 
+                                           title="Red de Colaboración Base - GitHub")
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Análisis detallado por repositorio
+    st.subheader("📁 Análisis por Repositorio")
+    
+    repo_analysis = []
+    for repo in repos:
+        repo_data = df[df['repo'] == repo]
+        repo_devs = set(repo_data['developer_source']) | set(repo_data['developer_target'])
+        
+        repo_analysis.append({
+            'Repositorio': repo,
+            'Interacciones': len(repo_data),
+            'Desarrolladores': len(repo_devs),
+            'Peso Promedio': repo_data['weight'].mean(),
+            'Tipos de Interacción': len(repo_data['interaction_type'].unique())
+        })
+    
+    repo_df = pd.DataFrame(repo_analysis)
+    st.dataframe(repo_df.style.format({
+        'Peso Promedio': '{:.2f}'
+    }).background_gradient(subset=['Interacciones']), use_container_width=True)
+
+def show_technical_leaders_classification(metrics, G, df, ai_optimizer):
+    """Sistema de Clasificación Inteligente de Desarrolladores como en el taller"""
+    st.markdown('<h2 class="section-header">🏆 Sistema de Clasificación Inteligente de Desarrolladores</h2>', unsafe_allow_html=True)
+    
+    st.markdown('<div class="ai-highlight">🤖 Algoritmo de scoring multidimensional para clasificación automática</div>', unsafe_allow_html=True)
+    
+    # Calcular scoring multidimensional como en el taller
+    developers = list(G.nodes())
+    
+    # Pesos para el scoring (como en el taller)
+    weights = {
+        'pagerank': 0.35,
+        'betweenness': 0.30,
+        'eigenvector': 0.20,
+        'closeness': 0.15
+    }
+    
+    # Calcular scores IA
+    ai_scores = {}
+    for dev in developers:
+        score = 0
+        score += metrics['pagerank'][dev] * weights['pagerank'] * 10  # Normalizar
+        score += metrics['betweenness'][dev] * weights['betweenness'] * 10
+        score += metrics['eigenvector'][dev] * weights['eigenvector'] * 10
+        score += metrics['closeness'][dev] * weights['closeness'] * 10
+        ai_scores[dev] = score
+    
+    # Clasificar en roles (como en el taller)
+    sorted_devs = sorted(ai_scores.items(), key=lambda x: x[1], reverse=True)
+    
+    # Determinar especialización basada en datos
+    specializations = {}
+    for dev in developers:
+        dev_data = df[(df['developer_source'] == dev) | (df['developer_target'] == dev)]
+        if len(dev_data) > 0:
+            # Determinar especialización por repositorio más frecuente
+            top_repo = dev_data['repo'].value_counts().index[0] if len(dev_data) > 0 else 'general'
+            if 'frontend' in top_repo.lower():
+                specializations[dev] = 'Frontend/Interfaces'
+            elif 'backend' in top_repo.lower() or 'api' in top_repo.lower():
+                specializations[dev] = 'Backend/Servicios'
+            elif 'data' in top_repo.lower():
+                specializations[dev] = 'Datos/Analytics'
+            else:
+                specializations[dev] = 'Desarrollo General'
+        else:
+            specializations[dev] = 'Sin especialización'
+    
+    # Asignar roles basado en percentiles (como en el taller)
+    scores = list(ai_scores.values())
+    threshold_leader = np.percentile(scores, 80)
+    threshold_connector = np.percentile(scores, 60)
+    threshold_senior = np.percentile(scores, 40)
+    
+    classified_devs = []
+    for dev, score in sorted_devs:
+        if score >= threshold_leader and metrics['betweenness'][dev] > np.percentile(list(metrics['betweenness'].values()), 70):
+            role = 'Líder Técnico'
+        elif metrics['betweenness'][dev] > np.percentile(list(metrics['betweenness'].values()), 80):
+            role = 'Conector Principal'
+        elif score >= threshold_senior:
+            role = 'Colaborador Senior'
+        elif 'backend' in specializations[dev].lower() or 'data' in specializations[dev].lower():
+            role = 'Especialista Backend'
+        elif 'frontend' in specializations[dev].lower():
+            role = 'Desarrollador Frontend'
+        else:
+            role = 'Desarrollador Junior'
+        
+        classified_devs.append({
+            'Desarrollador': dev,
+            'Rol Identificado': role,
+            'Score IA': f"{score:.3f}",
+            'Especialización': specializations[dev],
+            'PageRank': f"{metrics['pagerank'][dev]:.3f}",
+            'Intermediación': f"{metrics['betweenness'][dev]:.3f}",
+            'Colaboraciones': len(df[(df['developer_source'] == dev) | (df['developer_target'] == dev)])
+        })
+    
+    # Mostrar tabla de clasificación como en el taller (Cuadro 2)
+    st.subheader("📋 Cuadro 2: Clasificación automática de roles por IA")
+    
+    classification_df = pd.DataFrame(classified_devs)
+    
+    st.dataframe(
+        classification_df.style.background_gradient(subset=['Score IA']),
+        use_container_width=True
+    )
+    
+    # Análisis de distribución de roles
+    st.subheader("📊 Distribución de Roles Identificados")
+    
+    role_counts = classification_df['Rol Identificado'].value_counts()
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        fig = px.pie(values=role_counts.values, names=role_counts.index,
+                    title="Distribución de Roles por IA")
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        fig = px.bar(x=role_counts.index, y=role_counts.values,
+                    title="Cantidad por Rol")
+        fig.update_xaxis(tickangle=45)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Radar chart para top 5 desarrolladores
+    st.subheader("📡 Perfil Multidimensional - Top 5 Desarrolladores")
+    
+    top_5 = classified_devs[:5]
+    
+    categories = ['PageRank', 'Intermediación', 'Eigenvector', 'Cercanía', 'Colaboraciones']
+    
+    fig = go.Figure()
+    
+    colors = ['red', 'blue', 'green', 'orange', 'purple']
+    
+    for i, dev_data in enumerate(top_5):
+        dev = dev_data['Desarrollador']
+        collab_count = dev_data['Colaboraciones']
+        max_collabs = max([d['Colaboraciones'] for d in classified_devs])
+        
+        values = [
+            metrics['pagerank'][dev] / max(metrics['pagerank'].values()),
+            metrics['betweenness'][dev] / max(metrics['betweenness'].values()) if max(metrics['betweenness'].values()) > 0 else 0,
+            metrics['eigenvector'][dev] / max(metrics['eigenvector'].values()) if max(metrics['eigenvector'].values()) > 0 else 0,
+            metrics['closeness'][dev] / max(metrics['closeness'].values()),
+            collab_count / max_collabs
+        ]
+        values += values[:1]  # Cerrar el polígono
+        
+        fig.add_trace(go.Scatterpolar(
+            r=values,
+            theta=categories + [categories[0]],
+            fill='toself',
+            name=dev,
+            line_color=colors[i],
+            fillcolor=colors[i],
+            opacity=0.6
+        ))
+    
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(visible=True, range=[0, 1])
+        ),
+        title="Análisis Multidimensional de Líderes Técnicos",
+        showlegend=True
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+
+def show_complete_ai_optimization(ai_optimizer, G, df, visualizer):
+    """Optimización completa con métricas antes/después"""
+    st.markdown('<h2 class="section-header">🤖 Optimización Completa con IA</h2>', unsafe_allow_html=True)
+    
+    st.markdown('<div class="optimization-card">🚀 Análisis completo: Antes → Algoritmo de Optimización → Después</div>', unsafe_allow_html=True)
+    
+    # Métricas antes de la optimización
+    st.subheader("📊 Estado Actual (Antes de Optimización)")
+    
+    original_metrics = calculate_detailed_metrics(G)
+    
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    with col1:
+        st.metric("🏘️ Nodos", original_metrics['num_nodes'])
+    with col2:
+        st.metric("🔗 Aristas", original_metrics['num_edges'])
+    with col3:
+        st.metric("📊 Densidad", f"{original_metrics['density']:.3f}")
+    with col4:
+        st.metric("🕸️ Clustering", f"{original_metrics['avg_clustering']:.3f}")
+    with col5:
+        st.metric("🔄 Reciprocidad", f"{original_metrics['reciprocity']:.3f}")
+    
+    # Top nodos por centralidad de intermediación (antes)
+    st.subheader("🌉 Top Nodos - Centralidad de Intermediación (ANTES)")
+    
+    betweenness_before = sorted(original_metrics['betweenness_centrality'].items(), 
+                               key=lambda x: x[1], reverse=True)[:10]
+    
+    bet_df_before = pd.DataFrame(betweenness_before, columns=['Desarrollador', 'Intermediación'])
+    bet_df_before['Rango'] = range(1, len(bet_df_before) + 1)
+    
+    fig_bet_before = px.bar(bet_df_before, x='Intermediación', y='Desarrollador',
+                           orientation='h', title="Centralidad de Intermediación - ANTES",
+                           color='Intermediación', color_continuous_scale='viridis')
+    st.plotly_chart(fig_bet_before, use_container_width=True)
+    
+    # Top nodos por centralidad de grado (antes)
+    st.subheader("📊 Top Nodos - Centralidad de Grado (ANTES)")
+    
+    degree_before = sorted(original_metrics['degree_centrality'].items(), 
+                          key=lambda x: x[1], reverse=True)[:10]
+    
+    deg_df_before = pd.DataFrame(degree_before, columns=['Desarrollador', 'Grado'])
+    deg_df_before['Rango'] = range(1, len(deg_df_before) + 1)
+    
+    fig_deg_before = px.bar(deg_df_before, x='Grado', y='Desarrollador',
+                           orientation='h', title="Centralidad de Grado - ANTES",
+                           color='Grado', color_continuous_scale='plasma')
+    st.plotly_chart(fig_deg_before, use_container_width=True)
+    
+    # Ejecutar optimización
+    st.subheader("🚀 Ejecutar Optimización IA")
+    
+    if st.button("🤖 Ejecutar Optimización Completa del Grafo", type="primary"):
+        with st.spinner("🔄 Ejecutando algoritmos de optimización..."):
+            
+            # Aplicar optimización usando el optimizador mejorado
+            G_optimized = ai_optimizer.apply_optimization_recommendations(top_recommendations=5)
+            
+            # Obtener comparación completa
+            comparison_results = ai_optimizer.get_optimization_comparison()
+            
+            # Guardar en session state para mantener resultados
+            st.session_state['original_metrics'] = original_metrics
+            st.session_state['optimized_metrics'] = ai_optimizer.optimized_metrics
+            st.session_state['G_optimized'] = G_optimized
+            st.session_state['optimization_applied'] = True
+            st.session_state['comparison_results'] = comparison_results
+        
+        st.success("✅ Optimización completada!")
+        st.rerun()
+    
+    # Mostrar resultados si ya se ejecutó la optimización
+    if st.session_state.get('optimization_applied', False):
+        
+        optimized_metrics = st.session_state['optimized_metrics']
+        G_optimized = st.session_state['G_optimized']
+        comparison_results = st.session_state.get('comparison_results', {})
+        
+        st.subheader("📈 Estado Después de Optimización")
+        
+        col1, col2, col3, col4, col5 = st.columns(5)
+        
+        with col1:
+            delta_nodes = optimized_metrics['num_nodes'] - original_metrics['num_nodes']
+            st.metric("🏘️ Nodos", optimized_metrics['num_nodes'], delta=delta_nodes)
+        with col2:
+            delta_edges = optimized_metrics['num_edges'] - original_metrics['num_edges']
+            st.metric("🔗 Aristas", optimized_metrics['num_edges'], delta=delta_edges)
+        with col3:
+            delta_density = optimized_metrics['density'] - original_metrics['density']
+            st.metric("📊 Densidad", f"{optimized_metrics['density']:.3f}", 
+                     delta=f"{delta_density:+.3f}")
+        with col4:
+            delta_clustering = optimized_metrics['avg_clustering'] - original_metrics['avg_clustering']
+            st.metric("🕸️ Clustering", f"{optimized_metrics['avg_clustering']:.3f}", 
+                     delta=f"{delta_clustering:+.3f}")
+        with col5:
+            delta_reciprocity = optimized_metrics['reciprocity'] - original_metrics['reciprocity']
+            st.metric("🔄 Reciprocidad", f"{optimized_metrics['reciprocity']:.3f}", 
+                     delta=f"{delta_reciprocity:+.3f}")
+        
+        # Grafo después de la optimización
+        st.subheader("🕸️ Grafo Después de Aplicar el Algoritmo de Optimización")
+        
+        # Crear visualizador para el grafo optimizado
+        visualizer_optimized = NetworkVisualizer(G_optimized)
+        metrics_optimized = {
+            'pagerank': optimized_metrics['pagerank'],
+            'betweenness': optimized_metrics['betweenness_centrality'],
+            'closeness': optimized_metrics['closeness_centrality'],
+            'eigenvector': optimized_metrics['eigenvector_centrality']
+        }
+        
+        col1, col2 = st.columns([3, 1])
+        
+        with col2:
+            metric_option_opt = st.selectbox(
+                "Métrica para colorear (optimizado):",
+                ['pagerank', 'betweenness', 'closeness', 'eigenvector'],
+                key="optimized_metric"
+            )
+        
+        with col1:
+            fig_optimized = visualizer_optimized.create_network_plot(
+                metrics_optimized, metric_option_opt, 
+                title="Grafo OPTIMIZADO - Red de Colaboración"
+            )
+            st.plotly_chart(fig_optimized, use_container_width=True)
+        
+        # Top nodos por centralidad de intermediación (después)
+        st.subheader("🌉 Top Nodos - Centralidad de Intermediación (DESPUÉS)")
+        
+        betweenness_after = sorted(optimized_metrics['betweenness_centrality'].items(), 
+                                  key=lambda x: x[1], reverse=True)[:10]
+        
+        bet_df_after = pd.DataFrame(betweenness_after, columns=['Desarrollador', 'Intermediación'])
+        bet_df_after['Rango'] = range(1, len(bet_df_after) + 1)
+        
+        fig_bet_after = px.bar(bet_df_after, x='Intermediación', y='Desarrollador',
+                              orientation='h', title="Centralidad de Intermediación - DESPUÉS",
+                              color='Intermediación', color_continuous_scale='viridis')
+        st.plotly_chart(fig_bet_after, use_container_width=True)
+        
+        # Top nodos por centralidad de grado (después)
+        st.subheader("📊 Top Nodos - Centralidad de Grado (DESPUÉS)")
+        
+        degree_after = sorted(optimized_metrics['degree_centrality'].items(), 
+                             key=lambda x: x[1], reverse=True)[:10]
+        
+        deg_df_after = pd.DataFrame(degree_after, columns=['Desarrollador', 'Grado'])
+        deg_df_after['Rango'] = range(1, len(deg_df_after) + 1)
+        
+        fig_deg_after = px.bar(deg_df_after, x='Grado', y='Desarrollador',
+                              orientation='h', title="Centralidad de Grado - DESPUÉS",
+                              color='Grado', color_continuous_scale='plasma')
+        st.plotly_chart(fig_deg_after, use_container_width=True)
+        
+        # Resumen de mejoras conseguidas
+        if comparison_results.get('improvement_summary'):
+            improvement_summary = comparison_results['improvement_summary']
+            
+            st.subheader("🎯 Resumen de Mejoras Conseguidas")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric(
+                    "📈 Métricas Mejoradas",
+                    f"{improvement_summary['metrics_improved']}/{improvement_summary['total_metrics']}",
+                    help="Número de métricas que mejoraron"
+                )
+            
+            with col2:
+                st.metric(
+                    "🔗 Nuevas Conexiones",
+                    improvement_summary['new_connections'],
+                    help="Conexiones completamente nuevas añadidas"
+                )
+            
+            with col3:
+                st.metric(
+                    "💪 Conexiones Reforzadas",
+                    improvement_summary['reinforced_connections'],
+                    help="Conexiones existentes que se reforzaron"
+                )
+            
+            with col4:
+                st.metric(
+                    "🚧 Cuellos de Botella Mitigados",
+                    improvement_summary['bottlenecks_mitigated'],
+                    help="Cuellos de botella críticos que se aliviaron"
+                )
+        
+        # Tabla comparativa detallada de métricas globales
+        st.subheader("📋 Comparación Detallada: Métricas Globales")
+        
+        if comparison_results.get('metrics_comparison'):
+            comparison_data = []
+            
+            for metric_name, metric_data in comparison_results['metrics_comparison'].items():
+                comparison_data.append({
+                    'Métrica': metric_name.replace('_', ' ').title(),
+                    'Antes': f"{metric_data['before']:.4f}" if isinstance(metric_data['before'], float) else str(metric_data['before']),
+                    'Después': f"{metric_data['after']:.4f}" if isinstance(metric_data['after'], float) else str(metric_data['after']),
+                    'Cambio': f"{metric_data['change']:+.4f}" if isinstance(metric_data['change'], float) else f"{metric_data['change']:+d}",
+                    'Cambio %': f"{metric_data['change_percentage']:+.2f}%" if metric_data['change_percentage'] != 0 else "0.00%",
+                    'Mejoró': "✅" if metric_data.get('improved', False) else "➖"
+                })
+            
+            comparison_df = pd.DataFrame(comparison_data)
+            
+            st.dataframe(
+                comparison_df.style.applymap(
+                    lambda x: 'background-color: lightgreen' if '✅' in str(x) else 
+                             'background-color: lightcoral' if '➖' in str(x) else '',
+                    subset=['Mejoró']
+                ).applymap(
+                    lambda x: 'background-color: lightgreen' if '+' in str(x) and '%' in str(x) and x != '+0.00%' else 
+                             'background-color: lightcoral' if '-' in str(x) and '%' in str(x) else '',
+                    subset=['Cambio %']
+                ),
+                use_container_width=True
+            )
+
+def show_before_after_analysis(G, df, ai_optimizer, visualizer):
+    """Análisis detallado antes/después de optimización"""
+    st.markdown('<h2 class="section-header">🔬 Análisis Comparativo Detallado: Antes/Después</h2>', unsafe_allow_html=True)
+    
+    if not st.session_state.get('optimization_applied', False):
+        st.warning("⚠️ Primero debe ejecutar la optimización en la sección '🤖 Optimización IA Completa'")
+        return
+    
+    original_metrics = st.session_state['original_metrics']
+    optimized_metrics = st.session_state['optimized_metrics']
+    G_optimized = st.session_state['G_optimized']
+    
+    # Comparación visual lado a lado
+    st.subheader("👁️ Comparación Visual: Grafos Antes vs Después")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### 📊 ANTES de la Optimización")
+        
+        metrics_before = {
+            'pagerank': original_metrics['pagerank'],
+            'betweenness': original_metrics['betweenness_centrality'],
+            'closeness': original_metrics['closeness_centrality'],
+            'eigenvector': original_metrics['eigenvector_centrality']
+        }
+        
+        fig_before = visualizer.create_network_plot(
+            metrics_before, 'pagerank', 
+            title="Red Original"
+        )
+        st.plotly_chart(fig_before, use_container_width=True)
+        
+        # Métricas clave antes
+        st.write("**Métricas Clave:**")
+        st.write(f"• Densidad: {original_metrics['density']:.3f}")
+        st.write(f"• Clustering: {original_metrics['avg_clustering']:.3f}")
+        st.write(f"• Aristas: {original_metrics['num_edges']}")
+        st.write(f"• Reciprocidad: {original_metrics['reciprocity']:.3f}")
+    
+    with col2:
+        st.markdown("#### 🚀 DESPUÉS de la Optimización")
+        
+        visualizer_optimized = NetworkVisualizer(G_optimized)
+        metrics_after = {
+            'pagerank': optimized_metrics['pagerank'],
+            'betweenness': optimized_metrics['betweenness_centrality'],
+            'closeness': optimized_metrics['closeness_centrality'],
+            'eigenvector': optimized_metrics['eigenvector_centrality']
+        }
+        
+        fig_after = visualizer_optimized.create_network_plot(
+            metrics_after, 'pagerank', 
+            title="Red Optimizada"
+        )
+        st.plotly_chart(fig_after, use_container_width=True)
+        
+        # Métricas clave después
+        st.write("**Métricas Clave:**")
+        st.write(f"• Densidad: {optimized_metrics['density']:.3f}")
+        st.write(f"• Clustering: {optimized_metrics['avg_clustering']:.3f}")
+        st.write(f"• Aristas: {optimized_metrics['num_edges']}")
+        st.write(f"• Reciprocidad: {optimized_metrics['reciprocity']:.3f}")
+    
+    # Análisis de cambios en ranking
+    st.subheader("📈 Cambios en Rankings de Centralidad")
+    
+    # Betweenness centrality changes
+    betweenness_before_rank = {dev: rank for rank, (dev, _) in enumerate(
+        sorted(original_metrics['betweenness_centrality'].items(), key=lambda x: x[1], reverse=True), 1)}
+    betweenness_after_rank = {dev: rank for rank, (dev, _) in enumerate(
+        sorted(optimized_metrics['betweenness_centrality'].items(), key=lambda x: x[1], reverse=True), 1)}
+    
+    ranking_changes = []
+    for dev in G.nodes():
+        before_rank = betweenness_before_rank.get(dev, len(G.nodes()))
+        after_rank = betweenness_after_rank.get(dev, len(G.nodes()))
+        change = before_rank - after_rank  # Positivo = mejora en ranking
+        
+        ranking_changes.append({
+            'Desarrollador': dev,
+            'Ranking Antes': before_rank,
+            'Ranking Después': after_rank,
+            'Cambio': change,
+            'Centralidad Antes': f"{original_metrics['betweenness_centrality'][dev]:.3f}",
+            'Centralidad Después': f"{optimized_metrics['betweenness_centrality'][dev]:.3f}"
+        })
+    
+    ranking_df = pd.DataFrame(ranking_changes)
+    ranking_df = ranking_df.sort_values('Cambio', ascending=False)
+    
+    st.subheader("🔄 Cambios en Ranking de Centralidad de Intermediación")
+    st.dataframe(
+        ranking_df.style.applymap(
+            lambda x: 'background-color: lightgreen' if isinstance(x, (int, float)) and x > 0 else 
+                     'background-color: lightcoral' if isinstance(x, (int, float)) and x < 0 else '',
+            subset=['Cambio']
+        ),
+        use_container_width=True
+    )
+    
+    # Métricas de impacto de la optimización
+    st.subheader("🎯 Impacto de la Optimización")
+    
+    # Calcular mejoras porcentuales
+    density_improvement = ((optimized_metrics['density'] - original_metrics['density']) / original_metrics['density']) * 100
+    clustering_improvement = ((optimized_metrics['avg_clustering'] - original_metrics['avg_clustering']) / original_metrics['avg_clustering']) * 100
+    edges_added = optimized_metrics['num_edges'] - original_metrics['num_edges']
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            "📊 Mejora en Densidad", 
+            f"{density_improvement:+.1f}%",
+            help="Incremento porcentual en la densidad de la red"
+        )
+    
+    with col2:
+        st.metric(
+            "🕸️ Mejora en Clustering", 
+            f"{clustering_improvement:+.1f}%",
+            help="Incremento porcentual en clustering"
+        )
+    
+    with col3:
+        st.metric(
+            "🔗 Conexiones Añadidas", 
+            f"+{edges_added}",
+            help="Nuevas conexiones creadas por la optimización"
+        )
+    
+    with col4:
+        # Calcular diversidad de conexiones
+        original_connections = set()
+        for u, v in G.edges():
+            original_connections.add((min(u, v), max(u, v)))
+        
+        optimized_connections = set()
+        for u, v in G_optimized.edges():
+            optimized_connections.add((min(u, v), max(u, v)))
+        
+        new_connections = optimized_connections - original_connections
+        diversity_improvement = len(new_connections)
+        
+        st.metric(
+            "🎯 Nuevas Colaboraciones", 
+            diversity_improvement,
+            help="Número de nuevas colaboraciones únicas"
+        )
+    
+    # Análisis de impacto por desarrollador
+    st.subheader("👥 Impacto por Desarrollador")
+    
+    developer_impact = []
+    for dev in G.nodes():
+        original_degree = G.degree(dev, weight='weight')
+        optimized_degree = G_optimized.degree(dev, weight='weight')
+        degree_change = optimized_degree - original_degree
+        
+        original_betweenness = original_metrics['betweenness_centrality'][dev]
+        optimized_betweenness = optimized_metrics['betweenness_centrality'][dev]
+        betweenness_change = optimized_betweenness - original_betweenness
+        
+        developer_impact.append({
+            'Desarrollador': dev,
+            'Cambio en Grado': f"{degree_change:+.1f}",
+            'Cambio en Intermediación': f"{betweenness_change:+.3f}",
+            'Impacto Total': abs(degree_change) + abs(betweenness_change * 10)  # Score compuesto
+        })
+    
+    impact_df = pd.DataFrame(developer_impact)
+    impact_df = impact_df.sort_values('Impacto Total', ascending=False)
+    
+    st.dataframe(
+        impact_df.style.background_gradient(subset=['Impacto Total']),
+        use_container_width=True
+    )
 
 def show_general_overview(df, G, metrics):
     """Mostrar resumen general del análisis"""
@@ -264,100 +993,8 @@ def show_general_overview(df, G, metrics):
             f"{reciprocity:.3f}",
             help="Grado de colaboraciones bidireccionales"
         )
-    
-    # Tabla de datos mejorada
-    st.subheader("📋 Vista de Datos Enriquecida")
-    
-    # Enriquecer datos con métricas
-    enriched_df = df.copy()
-    enriched_df['source_pagerank'] = enriched_df['developer_source'].map(metrics['pagerank'])
-    enriched_df['target_pagerank'] = enriched_df['developer_target'].map(metrics['pagerank'])
-    enriched_df['collaboration_strength'] = enriched_df['source_pagerank'] * enriched_df['target_pagerank'] * enriched_df['weight']
-    
-    # Mostrar con formato mejorado
-    display_df = enriched_df[['developer_source', 'developer_target', 'interaction_type', 'repo', 'weight', 'collaboration_strength']].head(20)
-    display_df.columns = ['Desarrollador Origen', 'Desarrollador Destino', 'Tipo Interacción', 'Repositorio', 'Peso', 'Fuerza Colaboración']
-    
-    st.dataframe(
-        display_df.style.format({
-            'Peso': '{:.0f}',
-            'Fuerza Colaboración': '{:.4f}'
-        }).background_gradient(subset=['Fuerza Colaboración']),
-        use_container_width=True
-    )
 
-def show_network_analysis(G, metrics, visualizer):
-    """Mostrar análisis detallado de la red"""
-    st.markdown('<h2 class="section-header">🔍 Análisis de Red</h2>', unsafe_allow_html=True)
-    
-    # Métricas de centralidad mejoradas
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("📊 Top 10 - PageRank")
-        pagerank_df = pd.DataFrame([
-            {'Desarrollador': dev, 'PageRank': score, 'Rango': i+1}
-            for i, (dev, score) in enumerate(sorted(metrics['pagerank'].items(), key=lambda x: x[1], reverse=True)[:10])
-        ])
-        
-        fig = px.bar(
-            pagerank_df,
-            x='PageRank',
-            y='Desarrollador',
-            orientation='h',
-            title="Desarrolladores más Influyentes (PageRank)",
-            color='PageRank',
-            color_continuous_scale='viridis',
-            text='Rango'
-        )
-        fig.update_traces(textposition='inside')
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col2:
-        st.subheader("🌉 Top 10 - Intermediación")
-        betweenness_df = pd.DataFrame([
-            {'Desarrollador': dev, 'Intermediación': score, 'Rango': i+1}
-            for i, (dev, score) in enumerate(sorted(metrics['betweenness'].items(), key=lambda x: x[1], reverse=True)[:10])
-        ])
-        
-        fig = px.bar(
-            betweenness_df,
-            x='Intermediación',
-            y='Desarrollador',
-            orientation='h',
-            title="Desarrolladores Puente (Betweenness)",
-            color='Intermediación',
-            color_continuous_scale='plasma',
-            text='Rango'
-        )
-        fig.update_traces(textposition='inside')
-        st.plotly_chart(fig, use_container_width=True)
-    
-    # Visualización de la red con IA
-    st.subheader("🕸️ Visualización Inteligente de la Red")
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col2:
-        metric_option = st.selectbox(
-            "Métrica para colorear nodos:",
-            ['pagerank', 'betweenness', 'closeness', 'eigenvector']
-        )
-        
-        show_labels = st.checkbox("Mostrar etiquetas", value=True)
-        node_size_factor = st.slider("Factor tamaño nodos:", 1, 5, 2)
-    
-    with col1:
-        # Crear visualización de red mejorada
-        fig = visualizer.create_network_plot(metrics, metric_option)
-        st.plotly_chart(fig, use_container_width=True)
-    
-    # Análisis comparativo de métricas
-    st.subheader("📈 Análisis Comparativo de Métricas")
-    
-    comparison_fig = visualizer.create_centrality_comparison(metrics, top_k=8)
-    st.plotly_chart(comparison_fig, use_container_width=True)
-
+# Mantener las funciones existentes
 def show_ai_community_analysis(G, ai_community_detector, df, method):
     """Mostrar análisis de comunidades con IA"""
     st.markdown('<h2 class="section-header">👥 Análisis de Comunidades con IA</h2>', unsafe_allow_html=True)
@@ -417,257 +1054,10 @@ def show_ai_community_analysis(G, ai_community_detector, df, method):
                     st.metric("📈 Mejora Conseguida", "No significativa")
             
             st.success("✅ Optimización completada con algoritmo genético")
-        
-        # Análisis detallado por comunidad
-        st.subheader("📋 Análisis Detallado por Comunidad")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Tamaños de comunidades
-            community_sizes = pd.DataFrame([
-                {'Comunidad': f'Comunidad {i}', 'Tamaño': size}
-                for i, size in community_stats['community_sizes'].items()
-            ])
-            
-            fig = px.bar(
-                community_sizes,
-                x='Comunidad',
-                y='Tamaño',
-                title="Distribución del Tamaño de Comunidades",
-                color='Tamaño',
-                color_continuous_scale='viridis'
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            # Análisis de conexiones inter-comunitarias
-            inter_analysis = ai_community_detector.analyze_inter_community_connections(df)
-            
-            fig = go.Figure(data=[
-                go.Bar(name='Intra-comunidad', x=['Conexiones'], y=[inter_analysis['intra_community_count']]),
-                go.Bar(name='Inter-comunidad', x=['Conexiones'], y=[inter_analysis['inter_community_count']])
-            ])
-            fig.update_layout(
-                title='Conexiones Intra vs Inter-Comunitarias',
-                barmode='group'
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        
-        # Detalles expandibles de comunidades
-        st.subheader("🔍 Explorador de Comunidades")
-        
-        for comm_id in sorted(set(communities.values())):
-            members = [node for node, community in communities.items() if community == comm_id]
-            
-            with st.expander(f"🏘️ Comunidad {comm_id} ({len(members)} miembros)"):
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.write("**Miembros:**")
-                    st.write(", ".join(members))
-                
-                with col2:
-                    # Estadísticas de la comunidad
-                    subgraph = G.subgraph(members)
-                    if subgraph.number_of_edges() > 0:
-                        density = nx.density(subgraph)
-                        st.write(f"**Densidad interna:** {density:.3f}")
-                        
-                        # Conexiones más fuertes
-                        edges_with_weights = [(u, v, data['weight']) for u, v, data in subgraph.edges(data=True)]
-                        if edges_with_weights:
-                            edges_with_weights.sort(key=lambda x: x[2], reverse=True)
-                            st.write("**Top conexiones:**")
-                            for u, v, weight in edges_with_weights[:3]:
-                                st.write(f"  • {u} ↔ {v}: {weight}")
     
     except Exception as e:
         st.error(f"❌ Error en análisis de comunidades: {str(e)}")
         st.info("💡 Intenta con un método diferente o verifica las dependencias")
-
-def show_technical_leaders(metrics, G, df):
-    """Mostrar análisis de líderes técnicos mejorado"""
-    st.markdown('<h2 class="section-header">🏆 Líderes Técnicos</h2>', unsafe_allow_html=True)
-    
-    # Calcular puntuación combinada mejorada
-    weights = {
-        'pagerank': 0.35,
-        'betweenness': 0.30,
-        'eigenvector': 0.20,
-        'closeness': 0.15
-    }
-    
-    combined_scores = {}
-    
-    # Normalizar métricas
-    for metric_name, metric_dict in metrics.items():
-        if metric_name in weights:
-            values = list(metric_dict.values())
-            max_val = max(values) if values else 1.0
-            
-            for node, value in metric_dict.items():
-                if node not in combined_scores:
-                    combined_scores[node] = 0
-                combined_scores[node] += (value / max_val) * weights[metric_name]
-    
-    # Top líderes
-    top_leaders = sorted(combined_scores.items(), key=lambda x: x[1], reverse=True)[:10]
-    
-    st.subheader("🏆 Top 10 Líderes Técnicos")
-    
-    leaders_df = pd.DataFrame([
-        {
-            'Desarrollador': leader,
-            'Puntuación IA': f"{score:.3f}",
-            'PageRank': f"{metrics['pagerank'][leader]:.3f}",
-            'Intermediación': f"{metrics['betweenness'][leader]:.3f}",
-            'Eigenvector': f"{metrics['eigenvector'][leader]:.3f}",
-            'Cercanía': f"{metrics['closeness'][leader]:.3f}",
-            'Colaboraciones': len(df[(df['developer_source'] == leader) | (df['developer_target'] == leader)])
-        }
-        for leader, score in top_leaders
-    ])
-    
-    st.dataframe(
-        leaders_df.style.background_gradient(subset=['Puntuación IA']),
-        use_container_width=True
-    )
-    
-    # Gráfico de radar mejorado para top 5 líderes
-    st.subheader("📊 Perfil Multidimensional - Top 5 Líderes")
-    
-    top_5_leaders = [leader for leader, _ in top_leaders[:5]]
-    
-    categories = ['PageRank', 'Intermediación', 'Eigenvector', 'Cercanía', 'Colaboraciones']
-    
-    fig = go.Figure()
-    
-    colors = ['red', 'blue', 'green', 'orange', 'purple']
-    
-    for i, leader in enumerate(top_5_leaders):
-        collab_count = len(df[(df['developer_source'] == leader) | (df['developer_target'] == leader)])
-        max_collabs = max([len(df[(df['developer_source'] == l) | (df['developer_target'] == l)]) for l in top_5_leaders])
-        
-        values = [
-            metrics['pagerank'][leader] / max(metrics['pagerank'].values()),
-            metrics['betweenness'][leader] / max(metrics['betweenness'].values()),
-            metrics['eigenvector'][leader] / max(metrics['eigenvector'].values()),
-            metrics['closeness'][leader] / max(metrics['closeness'].values()),
-            collab_count / max_collabs
-        ]
-        values += values[:1]  # Cerrar el polígono
-        
-        fig.add_trace(go.Scatterpolar(
-            r=values,
-            theta=categories + [categories[0]],
-            fill='toself',
-            name=leader,
-            line_color=colors[i],
-            fillcolor=colors[i],
-            opacity=0.6
-        ))
-    
-    fig.update_layout(
-        polar=dict(
-            radialaxis=dict(visible=True, range=[0, 1])
-        ),
-        title="Perfil de Liderazgo Técnico - Análisis Multidimensional",
-        showlegend=True
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-
-def show_ai_optimization(ai_optimizer, optimization_level):
-    """Mostrar optimización con IA"""
-    st.markdown('<h2 class="section-header">🤖 Optimización con Inteligencia Artificial</h2>', unsafe_allow_html=True)
-    
-    st.markdown('<div class="optimization-card">🚀 Sistema de Optimización Avanzado - Utilizando algoritmos de Machine Learning para mejorar la colaboración</div>', unsafe_allow_html=True)
-    
-    # Formación de equipos optimizada
-    st.subheader("👥 Formación Óptima de Equipos")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        team_size = st.slider("Tamaño objetivo por equipo:", 3, 8, 5)
-        n_teams = st.slider("Número de equipos:", 2, 6, 3)
-    
-    with col2:
-        if st.button("🤖 Optimizar Formación de Equipos"):
-            with st.spinner("🔄 Analizando perfiles y optimizando equipos..."):
-                team_results = ai_optimizer.optimize_team_formation(team_size=team_size, n_teams=n_teams)
-            
-            st.success(f"✅ Equipos optimizados con score de silhouette: {team_results['silhouette_score']:.3f}")
-            
-            # Mostrar equipos balanceados
-            st.subheader("🎯 Equipos Optimizados")
-            
-            for team_name, members in team_results['balanced_teams'].items():
-                with st.expander(f"👥 {team_name} ({len(members)} miembros)"):
-                    st.write("**Miembros:**")
-                    st.write(", ".join(members))
-                    
-                    metrics = team_results['balanced_metrics']['team_diversity_scores'][team_name]
-                    col1, col2, col3 = st.columns(3)
-                    
-                    with col1:
-                        st.metric("🔗 Conexiones Internas", metrics['internal_connections'])
-                    with col2:
-                        st.metric("⚖️ Fuerza Total", f"{metrics['internal_strength']:.1f}")
-                    with col3:
-                        st.metric("📊 Fuerza Promedio", f"{metrics['avg_connection_strength']:.2f}")
-    
-    # Recomendaciones de colaboración
-    st.subheader("🎯 Recomendaciones de Colaboración IA")
-    
-    if st.button("🤖 Generar Recomendaciones"):
-        with st.spinner("🔄 Analizando patrones y generando recomendaciones..."):
-            recommendations = ai_optimizer.recommend_collaborations(top_k=10)
-        
-        st.success("✅ Recomendaciones generadas con algoritmos de similitud")
-        
-        # Mostrar recomendaciones en tabla
-        rec_df = pd.DataFrame(recommendations)
-        rec_df = rec_df[['developer_1', 'developer_2', 'similarity_score', 'mutual_connections', 'composite_score', 'reason']]
-        rec_df.columns = ['Desarrollador 1', 'Desarrollador 2', 'Similitud', 'Conexiones Mutuas', 'Score Total', 'Razón']
-        
-        st.dataframe(
-            rec_df.style.background_gradient(subset=['Score Total']).format({
-                'Similitud': '{:.3f}',
-                'Score Total': '{:.3f}'
-            }),
-            use_container_width=True
-        )
-    
-    # Optimización estructural
-    st.subheader("🏗️ Optimización Estructural de la Red")
-    
-    if st.button("🚀 Ejecutar Optimización Completa"):
-        with st.spinner("🔄 Ejecutando optimización estructural completa..."):
-            optimization_results = ai_optimizer.optimize_network_structure()
-        
-        st.success("✅ Optimización estructural completada")
-        
-        # Mostrar métricas actuales
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("📊 Métricas Actuales")
-            current_metrics = optimization_results['current_metrics']
-            
-            for metric, value in current_metrics.items():
-                if isinstance(value, float) and not np.isinf(value):
-                    st.metric(metric.replace('_', ' ').title(), f"{value:.3f}")
-                else:
-                    st.metric(metric.replace('_', ' ').title(), "N/A")
-        
-        with col2:
-            st.subheader("🎯 Oportunidades de Mejora")
-            improvements = optimization_results['improvement_opportunities']
-            
-            for improvement in improvements:
-                st.write(f"• {improvement}")
 
 def show_collaboration_patterns(ai_optimizer):
     """Mostrar patrones de colaboración detectados por IA"""
@@ -681,7 +1071,7 @@ def show_collaboration_patterns(ai_optimizer):
     
     temporal_patterns = patterns['temporal_patterns']
     
-    if 'peak_hours' in temporal_patterns:
+    if 'peak_hours' in temporal_patterns and temporal_patterns['peak_hours']:
         col1, col2 = st.columns(2)
         
         with col1:
@@ -695,51 +1085,43 @@ def show_collaboration_patterns(ai_optimizer):
         
         with col2:
             # Días activos
-            days_df = pd.DataFrame(list(temporal_patterns['active_days'].items()), 
-                                 columns=['Día', 'Colaboraciones'])
-            
-            fig = px.pie(days_df, values='Colaboraciones', names='Día',
-                        title="Distribución por Día de la Semana")
-            st.plotly_chart(fig, use_container_width=True)
-        
-        # Tendencias
-        if 'collaboration_trends' in temporal_patterns:
-            trends = temporal_patterns['collaboration_trends']
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                trend_color = "green" if trends['growth_rate'] > 0 else "red"
-                st.metric("📈 Tasa de Crecimiento", 
-                         f"{trends['growth_rate']:.2f}",
-                         delta=trends['trend'])
-            
-            with col2:
-                st.metric("📊 Volatilidad", f"{trends['volatility']:.2f}")
-            
-            with col3:
-                st.metric("🎯 Tendencia", trends['trend'].title())
+            if 'active_days' in temporal_patterns:
+                days_df = pd.DataFrame(list(temporal_patterns['active_days'].items()), 
+                                     columns=['Día', 'Colaboraciones'])
+                
+                fig = px.pie(days_df, values='Colaboraciones', names='Día',
+                            title="Distribución por Día de la Semana")
+                st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("📅 No hay datos temporales disponibles para análisis de patrones")
     
     # Patrones por repositorio
     st.subheader("📁 Patrones por Repositorio")
     
     repo_patterns = patterns['repository_patterns']
     
-    repo_stats_df = pd.DataFrame.from_dict(repo_patterns, orient='index').reset_index()
-    repo_stats_df.columns = ['Repositorio', 'Colaboraciones', 'Desarrolladores', 'Peso Promedio', 'Tipos Interacción', 'Densidad']
-    
-    # Eliminar columna de tipos de interacción para la visualización
-    display_cols = ['Repositorio', 'Colaboraciones', 'Desarrolladores', 'Peso Promedio', 'Densidad']
-    
-    fig = px.scatter(repo_stats_df, 
-                    x='Desarrolladores', 
-                    y='Colaboraciones',
-                    size='Peso Promedio',
-                    color='Densidad',
-                    hover_name='Repositorio',
-                    title="Análisis de Repositorios - Desarrolladores vs Colaboraciones")
-    
-    st.plotly_chart(fig, use_container_width=True)
+    if repo_patterns:
+        repo_stats_list = []
+        for repo, stats in repo_patterns.items():
+            repo_stats_list.append({
+                'Repositorio': repo,
+                'Colaboraciones': stats['total_collaborations'],
+                'Desarrolladores': stats['unique_developers'],
+                'Peso Promedio': stats['avg_weight'],
+                'Densidad': stats['collaboration_density']
+            })
+        
+        repo_stats_df = pd.DataFrame(repo_stats_list)
+        
+        fig = px.scatter(repo_stats_df, 
+                        x='Desarrolladores', 
+                        y='Colaboraciones',
+                        size='Peso Promedio',
+                        color='Densidad',
+                        hover_name='Repositorio',
+                        title="Análisis de Repositorios - Desarrolladores vs Colaboraciones")
+        
+        st.plotly_chart(fig, use_container_width=True)
     
     # Patrones de influencia
     st.subheader("👑 Patrones de Influencia")
@@ -764,318 +1146,45 @@ def show_ai_recommendations(G, metrics, ai_optimizer, df):
     
     st.markdown('<div class="ai-highlight">🎯 Recomendaciones generadas por algoritmos de Machine Learning para optimizar la colaboración</div>', unsafe_allow_html=True)
     
-    # Panel de configuración
-    col1, col2 = st.columns([2, 1])
+    # Generar recomendaciones
+    with st.spinner("🔄 Generando recomendaciones con IA..."):
+        recommendations = ai_optimizer.recommend_collaborations(top_k=10)
+        team_optimization = ai_optimizer.optimize_team_formation(team_size=4, n_teams=3)
     
-    with col2:
-        st.subheader("⚙️ Configuración")
-        recommendation_type = st.selectbox(
-            "Tipo de Recomendación:",
-            ["Colaboraciones Nuevas", "Formación de Equipos", "Mejoras Estructurales"]
+    # Recomendaciones de colaboración
+    st.subheader("🤝 Nuevas Colaboraciones Recomendadas")
+    
+    if recommendations:
+        rec_df = pd.DataFrame(recommendations)
+        display_df = rec_df[['developer_1', 'developer_2', 'composite_score', 'similarity_score', 'reason']]
+        display_df.columns = ['Desarrollador 1', 'Desarrollador 2', 'Score IA', 'Similitud', 'Razón']
+        
+        st.dataframe(
+            display_df.style.background_gradient(subset=['Score IA']).format({
+                'Score IA': '{:.3f}',
+                'Similitud': '{:.3f}'
+            }),
+            use_container_width=True
         )
-        
-        confidence_level = st.slider("Nivel de Confianza:", 0.5, 1.0, 0.8, 0.1)
     
-    with col1:
-        if recommendation_type == "Colaboraciones Nuevas":
-            st.subheader("🤝 Nuevas Colaboraciones Recomendadas")
-            
-            recommendations = ai_optimizer.recommend_collaborations(top_k=15)
-            
-            # Filtrar por nivel de confianza
-            filtered_recs = [r for r in recommendations if r['composite_score'] >= confidence_level]
-            
-            if filtered_recs:
-                # Visualización de red de recomendaciones
-                rec_graph = nx.Graph()
-                for rec in filtered_recs[:10]:
-                    rec_graph.add_edge(rec['developer_1'], rec['developer_2'], 
-                                     weight=rec['composite_score'])
-                
-                # Crear visualización
-                pos = nx.spring_layout(rec_graph)
-                
-                edge_x = []
-                edge_y = []
-                edge_weights = []
-                
-                for edge in rec_graph.edges(data=True):
-                    x0, y0 = pos[edge[0]]
-                    x1, y1 = pos[edge[1]]
-                    edge_x.extend([x0, x1, None])
-                    edge_y.extend([y0, y1, None])
-                    edge_weights.append(edge[2]['weight'])
-                
-                node_x = [pos[node][0] for node in rec_graph.nodes()]
-                node_y = [pos[node][1] for node in rec_graph.nodes()]
-                node_text = list(rec_graph.nodes())
-                
-                fig = go.Figure()
-                
-                # Aristas
-                fig.add_trace(go.Scatter(
-                    x=edge_x, y=edge_y,
-                    line=dict(width=2, color='rgba(0, 100, 200, 0.6)'),
-                    hoverinfo='none',
-                    mode='lines'
-                ))
-                
-                # Nodos
-                fig.add_trace(go.Scatter(
-                    x=node_x, y=node_y,
-                    mode='markers+text',
-                    text=node_text,
-                    textposition="middle center",
-                    hoverinfo='text',
-                    marker=dict(
-                        size=20,
-                        color='lightblue',
-                        line=dict(width=2, color="white")
-                    )
-                ))
-                
-                fig.update_layout(
-                    title="Red de Colaboraciones Recomendadas",
-                    showlegend=False,
-                    xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                    yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                    plot_bgcolor='white'
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Tabla de recomendaciones
-                st.subheader("📋 Detalles de Recomendaciones")
-                
-                rec_df = pd.DataFrame(filtered_recs[:10])
-                display_df = rec_df[['developer_1', 'developer_2', 'composite_score', 'reason']]
-                display_df.columns = ['Desarrollador 1', 'Desarrollador 2', 'Score IA', 'Razón']
-                
-                st.dataframe(
-                    display_df.style.background_gradient(subset=['Score IA']),
-                    use_container_width=True
-                )
-            else:
-                st.warning("No se encontraron recomendaciones con el nivel de confianza seleccionado")
-        
-        elif recommendation_type == "Formación de Equipos":
-            st.subheader("👥 Equipos Recomendados")
-            
-            team_results = ai_optimizer.optimize_team_formation(team_size=4, n_teams=3)
-            
-            for team_name, members in team_results['balanced_teams'].items():
-                with st.expander(f"👥 {team_name}"):
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.write("**Miembros:**")
-                        for member in members:
-                            pagerank_score = metrics['pagerank'].get(member, 0)
-                            st.write(f"• {member} (PR: {pagerank_score:.3f})")
-                    
-                    with col2:
-                        team_metrics = team_results['balanced_metrics']['team_diversity_scores'].get(team_name, {})
-                        st.metric("Conexiones Internas", team_metrics.get('internal_connections', 0))
-                        st.metric("Fuerza Promedio", f"{team_metrics.get('avg_connection_strength', 0):.2f}")
-        
-        else:  # Mejoras Estructurales
-            st.subheader("🏗️ Mejoras Estructurales Recomendadas")
-            
-            # Obtener análisis de optimización
-            optimization_results = ai_optimizer.optimize_network_structure()
-            
-            # Mostrar cuellos de botella
-            bottlenecks = optimization_results['bottleneck_analysis']
-            
-            if bottlenecks:
-                st.subheader("⚠️ Cuellos de Botella Identificados")
-                
-                bottleneck_df = pd.DataFrame(bottlenecks)
-                bottleneck_df.columns = ['Desarrollador', 'Intermediación', 'Grado', 'Nivel de Riesgo']
-                
-                st.dataframe(
-                    bottleneck_df.style.applymap(
-                        lambda x: 'background-color: red' if x == 'Alto' else 'background-color: orange' if x == 'Medio' else '',
-                        subset=['Nivel de Riesgo']
-                    ),
-                    use_container_width=True
-                )
-            else:
-                st.success("✅ No se detectaron cuellos de botella críticos")
-            
-            # Oportunidades de mejora
-            st.subheader("🎯 Plan de Mejora Recomendado")
-            
-            improvements = optimization_results['improvement_opportunities']
-            
-            for i, improvement in enumerate(improvements, 1):
-                st.write(f"**{i}.** {improvement}")
-            
-            # Métricas objetivo
-            st.subheader("📊 Métricas Objetivo Sugeridas")
-            
-            current_metrics = optimization_results['current_metrics']
-            
-            target_improvements = {
-                'density': min(0.3, current_metrics['density'] * 1.2),
-                'avg_clustering': min(0.8, current_metrics['avg_clustering'] * 1.15),
-                'num_components': max(1, current_metrics['num_components'] - 1)
-            }
-            
-            col1, col2, col3 = st.columns(3)
+    # Formación de equipos
+    st.subheader("👥 Equipos Recomendados")
+    
+    for team_name, members in team_optimization['balanced_teams'].items():
+        with st.expander(f"👥 {team_name} ({len(members)} miembros)"):
+            col1, col2 = st.columns(2)
             
             with col1:
-                st.metric(
-                    "🎯 Densidad Objetivo",
-                    f"{target_improvements['density']:.3f}",
-                    delta=f"+{target_improvements['density'] - current_metrics['density']:.3f}"
-                )
+                st.write("**Miembros:**")
+                for member in members:
+                    pagerank_score = metrics['pagerank'].get(member, 0)
+                    st.write(f"• {member} (PR: {pagerank_score:.3f})")
             
             with col2:
-                st.metric(
-                    "🎯 Clustering Objetivo", 
-                    f"{target_improvements['avg_clustering']:.3f}",
-                    delta=f"+{target_improvements['avg_clustering'] - current_metrics['avg_clustering']:.3f}"
-                )
-            
-            with col3:
-                st.metric(
-                    "🎯 Componentes Objetivo",
-                    target_improvements['num_components'],
-                    delta=f"{target_improvements['num_components'] - current_metrics['num_components']}"
-                )
-    
-    # Plan de acción con IA
-    st.subheader("📅 Plan de Acción Inteligente")
-    
-    action_plan = generate_ai_action_plan(recommendation_type, G, df, metrics)
-    
-    for phase in action_plan:
-        with st.expander(f"📋 {phase['title']}"):
-            st.write(f"**Duración:** {phase['duration']}")
-            st.write(f"**Objetivo:** {phase['objective']}")
-            st.write("**Acciones:**")
-            for action in phase['actions']:
-                st.write(f"• {action}")
-            
-            if 'metrics' in phase:
-                st.write("**Métricas a monitorear:**")
-                for metric in phase['metrics']:
-                    st.write(f"• {metric}")
-
-def generate_ai_action_plan(recommendation_type, G, df, metrics):
-    """Genera plan de acción basado en IA"""
-    
-    if recommendation_type == "Colaboraciones Nuevas":
-        return [
-            {
-                'title': 'Fase 1: Identificación y Contacto Inicial',
-                'duration': '1-2 semanas',
-                'objective': 'Establecer contacto entre desarrolladores recomendados',
-                'actions': [
-                    'Presentar desarrolladores con alta compatibilidad',
-                    'Organizar sesiones de coffee chat virtuales',
-                    'Facilitar presentaciones en reuniones de equipo'
-                ],
-                'metrics': ['Número de contactos establecidos', 'Feedback inicial de desarrolladores']
-            },
-            {
-                'title': 'Fase 2: Proyectos Piloto',
-                'duration': '2-4 semanas', 
-                'objective': 'Implementar colaboraciones en proyectos pequeños',
-                'actions': [
-                    'Asignar tareas colaborativas menores',
-                    'Implementar pair programming sessions',
-                    'Crear code review cruzado'
-                ],
-                'metrics': ['Número de colaboraciones activas', 'Calidad del código conjunto']
-            },
-            {
-                'title': 'Fase 3: Evaluación y Expansión',
-                'duration': '1-2 semanas',
-                'objective': 'Evaluar éxito y expandir colaboraciones',
-                'actions': [
-                    'Medir satisfacción de desarrolladores',
-                    'Analizar métricas de productividad',
-                    'Planificar expansión de colaboraciones exitosas'
-                ],
-                'metrics': ['Score de satisfacción', 'Incremento en métricas de red']
-            }
-        ]
-    
-    elif recommendation_type == "Formación de Equipos":
-        return [
-            {
-                'title': 'Fase 1: Análisis de Perfiles',
-                'duration': '1 semana',
-                'objective': 'Analizar compatibilidad y habilidades complementarias',
-                'actions': [
-                    'Evaluar skills técnicos de cada desarrollador',
-                    'Analizar estilos de trabajo y comunicación',
-                    'Identificar roles óptimos dentro de equipos'
-                ],
-                'metrics': ['Completitud de perfiles', 'Score de compatibilidad']
-            },
-            {
-                'title': 'Fase 2: Formación Gradual',
-                'duration': '2-3 semanas',
-                'objective': 'Formar equipos gradualmente con proyectos piloto',
-                'actions': [
-                    'Asignar proyectos pequeños a equipos nuevos',
-                    'Facilitar dinámicas de team building',
-                    'Establecer canales de comunicación eficientes'
-                ],
-                'metrics': ['Velocidad de entrega', 'Comunicación interna']
-            },
-            {
-                'title': 'Fase 3: Optimización Continua',
-                'duration': 'Continuo',
-                'objective': 'Optimizar dinámicas de equipo basado en datos',
-                'actions': [
-                    'Monitor continuo de métricas de equipo',
-                    'Ajustes basados en feedback y performance',
-                    'Rotación estratégica si es necesario'
-                ],
-                'metrics': ['Productividad del equipo', 'Satisfacción de miembros']
-            }
-        ]
-    
-    else:  # Mejoras Estructurales
-        return [
-            {
-                'title': 'Fase 1: Diagnóstico Detallado',
-                'duration': '1 semana',
-                'objective': 'Identificar puntos débiles estructurales',
-                'actions': [
-                    'Análisis profundo de cuellos de botella',
-                    'Identificación de componentes desconectados',
-                    'Mapeo de flujos de información críticos'
-                ],
-                'metrics': ['Número de bottlenecks', 'Componentes aislados']
-            },
-            {
-                'title': 'Fase 2: Intervenciones Estratégicas',
-                'duration': '3-4 semanas',
-                'objective': 'Implementar cambios estructurales clave',
-                'actions': [
-                    'Crear conexiones entre componentes aislados',
-                    'Diversificar responsabilidades de nodos críticos',
-                    'Establecer canales de comunicación redundantes'
-                ],
-                'metrics': ['Mejora en densidad', 'Reducción de intermediación crítica']
-            },
-            {
-                'title': 'Fase 3: Monitoreo y Ajuste',
-                'duration': 'Continuo',
-                'objective': 'Mantener estructura optimizada',
-                'actions': [
-                    'Monitoreo continuo de métricas de red',
-                    'Ajustes proactivos ante cambios',
-                    'Prevención de nuevos cuellos de botella'
-                ],
-                'metrics': ['Estabilidad de métricas', 'Resiliencia de la red']
-            }
-        ]
+                team_metrics = team_optimization['balanced_metrics']['team_diversity_scores'].get(team_name, {})
+                if team_metrics:
+                    st.metric("Conexiones Internas", team_metrics.get('internal_connections', 0))
+                    st.metric("Fuerza Promedio", f"{team_metrics.get('avg_connection_strength', 0):.2f}")
 
 if __name__ == "__main__":
     main()

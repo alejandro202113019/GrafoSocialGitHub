@@ -28,6 +28,72 @@ class AINetworkOptimizer:
         self.data = collaboration_data
         self.node_features = None
         self.optimization_results = {}
+        self.original_metrics = None
+        self.optimized_graph = None
+        self.optimized_metrics = None
+    
+    def calculate_comprehensive_metrics(self, graph: nx.DiGraph) -> Dict[str, Any]:
+        """
+        Calcula métricas comprehensivas para un grafo
+        
+        Args:
+            graph: Grafo a analizar
+            
+        Returns:
+            Diccionario completo de métricas
+        """
+        metrics = {}
+        undirected_g = graph.to_undirected()
+        
+        # Métricas básicas
+        metrics['num_nodes'] = graph.number_of_nodes()
+        metrics['num_edges'] = graph.number_of_edges()
+        metrics['density'] = nx.density(graph)
+        
+        # Métricas de centralidad
+        metrics['pagerank'] = nx.pagerank(graph, weight='weight')
+        metrics['betweenness_centrality'] = nx.betweenness_centrality(graph, weight='weight')
+        metrics['degree_centrality'] = nx.degree_centrality(graph)
+        metrics['closeness_centrality'] = nx.closeness_centrality(graph, distance='weight')
+        
+        try:
+            metrics['eigenvector_centrality'] = nx.eigenvector_centrality(graph, weight='weight', max_iter=1000)
+        except:
+            metrics['eigenvector_centrality'] = {node: 0.0 for node in graph.nodes()}
+        
+        # Métricas globales
+        metrics['avg_clustering'] = nx.average_clustering(undirected_g, weight='weight')
+        metrics['num_components'] = nx.number_connected_components(undirected_g)
+        metrics['reciprocity'] = nx.reciprocity(graph)
+        
+        if nx.is_connected(undirected_g):
+            metrics['diameter'] = nx.diameter(undirected_g)
+            metrics['avg_path_length'] = nx.average_shortest_path_length(undirected_g)
+        else:
+            metrics['diameter'] = float('inf')
+            metrics['avg_path_length'] = float('inf')
+        
+        # Métricas avanzadas
+        metrics['transitivity'] = nx.transitivity(undirected_g)
+        metrics['global_efficiency'] = nx.global_efficiency(undirected_g)
+        
+        # Rankings de centralidad
+        metrics['betweenness_ranking'] = sorted(
+            metrics['betweenness_centrality'].items(), 
+            key=lambda x: x[1], reverse=True
+        )
+        
+        metrics['degree_ranking'] = sorted(
+            metrics['degree_centrality'].items(), 
+            key=lambda x: x[1], reverse=True
+        )
+        
+        metrics['pagerank_ranking'] = sorted(
+            metrics['pagerank'].items(), 
+            key=lambda x: x[1], reverse=True
+        )
+        
+        return metrics
     
     def extract_node_features(self) -> np.ndarray:
         """
@@ -111,6 +177,301 @@ class AINetworkOptimizer:
         self.node_features = scaler.fit_transform(features_matrix)
         
         return self.node_features
+    
+    def apply_optimization_recommendations(self, top_recommendations: int = 5) -> nx.DiGraph:
+        """
+        Aplica las mejores recomendaciones de optimización al grafo
+        
+        Args:
+            top_recommendations: Número de recomendaciones a aplicar
+            
+        Returns:
+            Grafo optimizado
+        """
+        # Guardar métricas originales si no se han guardado
+        if self.original_metrics is None:
+            self.original_metrics = self.calculate_comprehensive_metrics(self.graph)
+        
+        # Crear copia del grafo para optimización
+        optimized_graph = self.graph.copy()
+        
+        # Obtener recomendaciones de colaboración
+        recommendations = self.recommend_collaborations(top_k=top_recommendations * 2)
+        
+        # Aplicar las mejores recomendaciones
+        applied_recommendations = []
+        for i, rec in enumerate(recommendations[:top_recommendations]):
+            if rec['composite_score'] > 0.5:  # Solo aplicar recomendaciones de alta calidad
+                dev1, dev2 = rec['developer_1'], rec['developer_2']
+                
+                # Calcular peso de la nueva conexión basado en el score
+                new_weight = rec['composite_score'] * 3  # Escalar score a peso
+                
+                if not optimized_graph.has_edge(dev1, dev2):
+                    optimized_graph.add_edge(dev1, dev2, weight=new_weight)
+                    applied_recommendations.append({
+                        'from': dev1,
+                        'to': dev2,
+                        'weight': new_weight,
+                        'reason': rec['reason']
+                    })
+                else:
+                    # Reforzar conexión existente
+                    optimized_graph[dev1][dev2]['weight'] += new_weight * 0.5
+                    applied_recommendations.append({
+                        'from': dev1,
+                        'to': dev2,
+                        'weight_increase': new_weight * 0.5,
+                        'reason': f"Refuerzo: {rec['reason']}"
+                    })
+        
+        # Aplicar optimizaciones estructurales adicionales
+        bottlenecks = self._identify_bottlenecks_advanced(optimized_graph)
+        
+        # Mitigar cuellos de botella críticos
+        for bottleneck in bottlenecks[:2]:  # Solo los 2 más críticos
+            critical_node = bottleneck['node']
+            
+            # Encontrar nodos para crear conexiones alternativas
+            neighbors = list(optimized_graph.neighbors(critical_node))
+            non_neighbors = [n for n in optimized_graph.nodes() if n != critical_node and n not in neighbors]
+            
+            if len(non_neighbors) >= 2:
+                # Crear conexiones entre no-vecinos para reducir dependencia
+                selected_nodes = np.random.choice(non_neighbors, min(2, len(non_neighbors)), replace=False)
+                for i in range(len(selected_nodes) - 1):
+                    node1, node2 = selected_nodes[i], selected_nodes[i + 1]
+                    if not optimized_graph.has_edge(node1, node2):
+                        optimized_graph.add_edge(node1, node2, weight=2.0)
+                        applied_recommendations.append({
+                            'from': node1,
+                            'to': node2,
+                            'weight': 2.0,
+                            'reason': f'Mitigación cuello de botella: {critical_node}'
+                        })
+        
+        # Guardar grafo optimizado y calcular métricas
+        self.optimized_graph = optimized_graph
+        self.optimized_metrics = self.calculate_comprehensive_metrics(optimized_graph)
+        
+        # Guardar detalles de optimización
+        self.optimization_results = {
+            'applied_recommendations': applied_recommendations,
+            'bottlenecks_mitigated': len(bottlenecks[:2]),
+            'new_connections': len([r for r in applied_recommendations if 'weight_increase' not in r]),
+            'reinforced_connections': len([r for r in applied_recommendations if 'weight_increase' in r])
+        }
+        
+        return optimized_graph
+    
+    def _identify_bottlenecks_advanced(self, graph: nx.DiGraph) -> List[Dict[str, Any]]:
+        """
+        Identifica cuellos de botella avanzados en la red
+        
+        Args:
+            graph: Grafo a analizar
+            
+        Returns:
+            Lista de cuellos de botella ordenados por criticidad
+        """
+        betweenness = nx.betweenness_centrality(graph, weight='weight')
+        degree = dict(graph.degree(weight='weight'))
+        
+        bottlenecks = []
+        for node in graph.nodes():
+            bet_score = betweenness[node]
+            deg_score = degree[node]
+            
+            # Calcular criticidad combinada
+            if deg_score > 0:
+                criticality = bet_score * (1 + 1/deg_score)  # Alta intermediación + pocas conexiones = crítico
+                
+                if bet_score > 0.05:  # Umbral mínimo de intermediación
+                    bottlenecks.append({
+                        'node': node,
+                        'betweenness': bet_score,
+                        'degree': deg_score,
+                        'criticality': criticality,
+                        'risk_level': 'Alto' if criticality > 0.1 else 'Medio'
+                    })
+        
+        return sorted(bottlenecks, key=lambda x: x['criticality'], reverse=True)
+    
+    def get_optimization_comparison(self) -> Dict[str, Any]:
+        """
+        Genera comparación detallada antes/después de optimización
+        
+        Returns:
+            Diccionario con comparación completa
+        """
+        if self.original_metrics is None or self.optimized_metrics is None:
+            return {'error': 'Optimización no ejecutada. Ejecute apply_optimization_recommendations primero.'}
+        
+        comparison = {
+            'metrics_comparison': {},
+            'ranking_changes': {},
+            'improvement_summary': {},
+            'detailed_analysis': {}
+        }
+        
+        # Comparación de métricas globales
+        global_metrics = ['density', 'avg_clustering', 'reciprocity', 'num_edges', 'num_components']
+        
+        for metric in global_metrics:
+            before = self.original_metrics.get(metric, 0)
+            after = self.optimized_metrics.get(metric, 0)
+            
+            if isinstance(before, (int, float)) and isinstance(after, (int, float)):
+                change = after - before
+                change_pct = (change / before * 100) if before != 0 else 0
+                
+                comparison['metrics_comparison'][metric] = {
+                    'before': before,
+                    'after': after,
+                    'change': change,
+                    'change_percentage': change_pct,
+                    'improved': change > 0
+                }
+        
+        # Cambios en rankings de centralidad
+        comparison['ranking_changes'] = self._analyze_ranking_changes()
+        
+        # Resumen de mejoras
+        positive_changes = sum(1 for m in comparison['metrics_comparison'].values() if m.get('improved', False))
+        total_metrics = len(comparison['metrics_comparison'])
+        
+        comparison['improvement_summary'] = {
+            'metrics_improved': positive_changes,
+            'total_metrics': total_metrics,
+            'improvement_rate': positive_changes / total_metrics if total_metrics > 0 else 0,
+            'new_connections': self.optimization_results.get('new_connections', 0),
+            'reinforced_connections': self.optimization_results.get('reinforced_connections', 0),
+            'bottlenecks_mitigated': self.optimization_results.get('bottlenecks_mitigated', 0)
+        }
+        
+        # Análisis detallado por desarrollador
+        comparison['detailed_analysis'] = self._analyze_developer_impact()
+        
+        return comparison
+    
+    def _analyze_ranking_changes(self) -> Dict[str, List[Dict]]:
+        """
+        Analiza cambios en rankings de centralidad
+        
+        Returns:
+            Diccionario con cambios en rankings
+        """
+        changes = {}
+        
+        # Analizar cambios en betweenness centrality
+        before_bet_rank = {dev: rank for rank, (dev, _) in enumerate(self.original_metrics['betweenness_ranking'], 1)}
+        after_bet_rank = {dev: rank for rank, (dev, _) in enumerate(self.optimized_metrics['betweenness_ranking'], 1)}
+        
+        betweenness_changes = []
+        for dev in self.graph.nodes():
+            before_rank = before_bet_rank.get(dev, len(self.graph.nodes()))
+            after_rank = after_bet_rank.get(dev, len(self.graph.nodes()))
+            rank_change = before_rank - after_rank  # Positivo = mejora
+            
+            betweenness_changes.append({
+                'developer': dev,
+                'before_rank': before_rank,
+                'after_rank': after_rank,
+                'rank_change': rank_change,
+                'before_value': self.original_metrics['betweenness_centrality'][dev],
+                'after_value': self.optimized_metrics['betweenness_centrality'][dev]
+            })
+        
+        changes['betweenness_centrality'] = sorted(betweenness_changes, key=lambda x: x['rank_change'], reverse=True)
+        
+        # Analizar cambios en degree centrality
+        before_deg_rank = {dev: rank for rank, (dev, _) in enumerate(self.original_metrics['degree_ranking'], 1)}
+        after_deg_rank = {dev: rank for rank, (dev, _) in enumerate(self.optimized_metrics['degree_ranking'], 1)}
+        
+        degree_changes = []
+        for dev in self.graph.nodes():
+            before_rank = before_deg_rank.get(dev, len(self.graph.nodes()))
+            after_rank = after_deg_rank.get(dev, len(self.graph.nodes()))
+            rank_change = before_rank - after_rank
+            
+            degree_changes.append({
+                'developer': dev,
+                'before_rank': before_rank,
+                'after_rank': after_rank,
+                'rank_change': rank_change,
+                'before_value': self.original_metrics['degree_centrality'][dev],
+                'after_value': self.optimized_metrics['degree_centrality'][dev]
+            })
+        
+        changes['degree_centrality'] = sorted(degree_changes, key=lambda x: x['rank_change'], reverse=True)
+        
+        return changes
+    
+    def _analyze_developer_impact(self) -> Dict[str, Any]:
+        """
+        Analiza el impacto de la optimización por desarrollador
+        
+        Returns:
+            Análisis de impacto por desarrollador
+        """
+        impact_analysis = {
+            'most_benefited': [],
+            'most_affected': [],
+            'new_connections_by_developer': {},
+            'centrality_improvements': {}
+        }
+        
+        # Calcular impacto por desarrollador
+        developer_impacts = []
+        
+        for dev in self.graph.nodes():
+            # Cambios en centralidad
+            bet_before = self.original_metrics['betweenness_centrality'][dev]
+            bet_after = self.optimized_metrics['betweenness_centrality'][dev]
+            bet_change = bet_after - bet_before
+            
+            deg_before = self.original_metrics['degree_centrality'][dev]
+            deg_after = self.optimized_metrics['degree_centrality'][dev]
+            deg_change = deg_after - deg_before
+            
+            pagerank_before = self.original_metrics['pagerank'][dev]
+            pagerank_after = self.optimized_metrics['pagerank'][dev]
+            pagerank_change = pagerank_after - pagerank_before
+            
+            # Score de impacto total
+            total_impact = abs(bet_change) + abs(deg_change) + abs(pagerank_change)
+            
+            developer_impacts.append({
+                'developer': dev,
+                'betweenness_change': bet_change,
+                'degree_change': deg_change,
+                'pagerank_change': pagerank_change,
+                'total_impact': total_impact,
+                'positive_impact': bet_change > 0 or deg_change > 0 or pagerank_change > 0
+            })
+        
+        # Ordenar por impacto
+        developer_impacts.sort(key=lambda x: x['total_impact'], reverse=True)
+        
+        # Identificar más beneficiados y afectados
+        impact_analysis['most_benefited'] = [d for d in developer_impacts if d['positive_impact']][:5]
+        impact_analysis['most_affected'] = developer_impacts[:10]
+        
+        # Contar nuevas conexiones por desarrollador
+        for rec in self.optimization_results.get('applied_recommendations', []):
+            dev1 = rec.get('from')
+            dev2 = rec.get('to')
+            
+            if dev1 and dev2:
+                if dev1 not in impact_analysis['new_connections_by_developer']:
+                    impact_analysis['new_connections_by_developer'][dev1] = 0
+                if dev2 not in impact_analysis['new_connections_by_developer']:
+                    impact_analysis['new_connections_by_developer'][dev2] = 0
+                
+                impact_analysis['new_connections_by_developer'][dev1] += 1
+                impact_analysis['new_connections_by_developer'][dev2] += 1
+        
+        return impact_analysis
     
     def optimize_team_formation(self, team_size: int = 5, n_teams: int = 3) -> Dict[str, Any]:
         """
@@ -501,10 +862,104 @@ class AINetworkOptimizer:
         # Análisis de datos
         interaction_counts = self.data['interaction_type'].value_counts()
         if len(interaction_counts) == 1:
-            improvements.append("Diversificar tipos de interaccionse")
+            improvements.append("Diversificar tipos de interacciones")
         
         repo_distribution = self.data['repo'].value_counts()
         if repo_distribution.iloc[0] > len(self.data) * 0.8:
             improvements.append("Promover colaboración entre repositorios")
         
         return improvements
+    
+    def generate_comprehensive_report(self) -> Dict[str, Any]:
+        """
+        Genera reporte comprehensivo de análisis y optimización
+        
+        Returns:
+            Reporte completo del análisis
+        """
+        if self.original_metrics is None:
+            self.original_metrics = self.calculate_comprehensive_metrics(self.graph)
+        
+        report = {
+            'executive_summary': self._generate_executive_summary(),
+            'original_network_analysis': self._format_network_analysis(self.original_metrics),
+            'optimization_recommendations': self.recommend_collaborations(10),
+            'team_formation_analysis': self.optimize_team_formation(),
+            'collaboration_patterns': self.detect_collaboration_patterns(),
+            'bottleneck_analysis': self._identify_bottlenecks_advanced(self.graph),
+            'improvement_opportunities': self._identify_improvements()
+        }
+        
+        # Si hay optimización aplicada, incluir comparación
+        if self.optimized_metrics is not None:
+            report['optimization_results'] = self.get_optimization_comparison()
+            report['optimized_network_analysis'] = self._format_network_analysis(self.optimized_metrics)
+        
+        return report
+    
+    def _generate_executive_summary(self) -> Dict[str, Any]:
+        """Genera resumen ejecutivo del análisis"""
+        metrics = self.original_metrics or self.calculate_comprehensive_metrics(self.graph)
+        
+        # Calcular scores de salud de la red
+        density_score = min(1.0, metrics['density'] * 5)  # Normalizar densidad
+        clustering_score = metrics['avg_clustering']
+        reciprocity_score = metrics['reciprocity']
+        
+        overall_health = (density_score + clustering_score + reciprocity_score) / 3
+        
+        summary = {
+            'network_health_score': overall_health,
+            'total_developers': metrics['num_nodes'],
+            'total_interactions': metrics['num_edges'],
+            'collaboration_density': metrics['density'],
+            'key_insights': [],
+            'priority_recommendations': []
+        }
+        
+        # Generar insights automáticos
+        if metrics['density'] < 0.1:
+            summary['key_insights'].append("Red poco densa - oportunidad para más colaboraciones")
+            summary['priority_recommendations'].append("Implementar programa de mentoring cruzado")
+        
+        if metrics['reciprocity'] > 0.7:
+            summary['key_insights'].append("Alta reciprocidad - colaboraciones bidireccionales saludables")
+        
+        if metrics['num_components'] > 1:
+            summary['key_insights'].append("Red fragmentada - equipos aislados identificados")
+            summary['priority_recommendations'].append("Crear puentes entre equipos aislados")
+        
+        # Identificar líderes clave
+        top_pagerank = max(metrics['pagerank'].items(), key=lambda x: x[1])
+        top_betweenness = max(metrics['betweenness_centrality'].items(), key=lambda x: x[1])
+        
+        summary['key_leaders'] = {
+            'most_influential': top_pagerank[0],
+            'key_connector': top_betweenness[0]
+        }
+        
+        return summary
+    
+    def _format_network_analysis(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
+        """Formatea análisis de red para reporte"""
+        return {
+            'basic_metrics': {
+                'nodes': metrics['num_nodes'],
+                'edges': metrics['num_edges'],
+                'density': round(metrics['density'], 4),
+                'avg_clustering': round(metrics['avg_clustering'], 4),
+                'reciprocity': round(metrics['reciprocity'], 4)
+            },
+            'centrality_leaders': {
+                'pagerank_top5': [(dev, round(score, 4)) for dev, score in metrics['pagerank_ranking'][:5]],
+                'betweenness_top5': [(dev, round(score, 4)) for dev, score in metrics['betweenness_ranking'][:5]],
+                'degree_top5': [(dev, round(score, 4)) for dev, score in metrics['degree_ranking'][:5]]
+            },
+            'structural_properties': {
+                'components': metrics['num_components'],
+                'diameter': metrics['diameter'] if metrics['diameter'] != float('inf') else 'N/A',
+                'avg_path_length': round(metrics['avg_path_length'], 4) if metrics['avg_path_length'] != float('inf') else 'N/A',
+                'transitivity': round(metrics.get('transitivity', 0), 4),
+                'global_efficiency': round(metrics.get('global_efficiency', 0), 4)
+            }
+        }
