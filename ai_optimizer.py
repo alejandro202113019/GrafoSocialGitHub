@@ -196,59 +196,127 @@ class AINetworkOptimizer:
         optimized_graph = self.graph.copy()
         
         # Obtener recomendaciones de colaboración
-        recommendations = self.recommend_collaborations(top_k=top_recommendations * 2)
+        recommendations = self.recommend_collaborations(top_k=top_recommendations * 3)
         
-        # Aplicar las mejores recomendaciones
+        # Aplicar las mejores recomendaciones de manera más agresiva
         applied_recommendations = []
-        for i, rec in enumerate(recommendations[:top_recommendations]):
-            if rec['composite_score'] > 0.5:  # Solo aplicar recomendaciones de alta calidad
-                dev1, dev2 = rec['developer_1'], rec['developer_2']
-                
-                # Calcular peso de la nueva conexión basado en el score
-                new_weight = rec['composite_score'] * 3  # Escalar score a peso
-                
-                if not optimized_graph.has_edge(dev1, dev2):
-                    optimized_graph.add_edge(dev1, dev2, weight=new_weight)
-                    applied_recommendations.append({
-                        'from': dev1,
-                        'to': dev2,
-                        'weight': new_weight,
-                        'reason': rec['reason']
-                    })
-                else:
-                    # Reforzar conexión existente
-                    optimized_graph[dev1][dev2]['weight'] += new_weight * 0.5
-                    applied_recommendations.append({
-                        'from': dev1,
-                        'to': dev2,
-                        'weight_increase': new_weight * 0.5,
-                        'reason': f"Refuerzo: {rec['reason']}"
-                    })
+        connections_added = 0
+        
+        # Filtrar recomendaciones de alta calidad
+        high_quality_recs = [r for r in recommendations if r['composite_score'] > 0.3]
+        
+        for i, rec in enumerate(high_quality_recs[:top_recommendations]):
+            dev1, dev2 = rec['developer_1'], rec['developer_2']
+            
+            # Calcular peso de la nueva conexión basado en el score
+            base_weight = rec['composite_score'] * 4  # Incrementar peso base
+            
+            # Añadir variabilidad basada en factores adicionales
+            mutual_factor = 1 + (rec['mutual_connections'] * 0.1)
+            repo_factor = 1 + (rec['repo_overlap'] * 0.2)
+            similarity_factor = 1 + (rec['similarity_score'] * 0.3)
+            
+            new_weight = base_weight * mutual_factor * repo_factor * similarity_factor
+            
+            if not optimized_graph.has_edge(dev1, dev2) and not optimized_graph.has_edge(dev2, dev1):
+                # Añadir nueva conexión
+                optimized_graph.add_edge(dev1, dev2, weight=new_weight)
+                connections_added += 1
+                applied_recommendations.append({
+                    'from': dev1,
+                    'to': dev2,
+                    'weight': new_weight,
+                    'reason': rec['reason'],
+                    'composite_score': rec['composite_score']
+                })
+            elif optimized_graph.has_edge(dev1, dev2):
+                # Reforzar conexión existente
+                old_weight = optimized_graph[dev1][dev2]['weight']
+                optimized_graph[dev1][dev2]['weight'] += new_weight * 0.3
+                applied_recommendations.append({
+                    'from': dev1,
+                    'to': dev2,
+                    'weight_increase': new_weight * 0.3,
+                    'reason': f"Refuerzo: {rec['reason']}",
+                    'original_weight': old_weight
+                })
+            elif optimized_graph.has_edge(dev2, dev1):
+                # Reforzar conexión en dirección opuesta
+                old_weight = optimized_graph[dev2][dev1]['weight']
+                optimized_graph[dev2][dev1]['weight'] += new_weight * 0.3
+                applied_recommendations.append({
+                    'from': dev2,
+                    'to': dev1,
+                    'weight_increase': new_weight * 0.3,
+                    'reason': f"Refuerzo inverso: {rec['reason']}",
+                    'original_weight': old_weight
+                })
         
         # Aplicar optimizaciones estructurales adicionales
         bottlenecks = self._identify_bottlenecks_advanced(optimized_graph)
         
-        # Mitigar cuellos de botella críticos
-        for bottleneck in bottlenecks[:2]:  # Solo los 2 más críticos
+        # Mitigar cuellos de botella críticos de manera más efectiva
+        bottlenecks_mitigated = 0
+        for bottleneck in bottlenecks[:3]:  # Incrementar a 3 cuellos de botella
             critical_node = bottleneck['node']
             
             # Encontrar nodos para crear conexiones alternativas
-            neighbors = list(optimized_graph.neighbors(critical_node))
-            non_neighbors = [n for n in optimized_graph.nodes() if n != critical_node and n not in neighbors]
+            neighbors = set(optimized_graph.neighbors(critical_node))
+            all_nodes = set(optimized_graph.nodes()) - {critical_node}
+            non_neighbors = list(all_nodes - neighbors)
             
             if len(non_neighbors) >= 2:
-                # Crear conexiones entre no-vecinos para reducir dependencia
-                selected_nodes = np.random.choice(non_neighbors, min(2, len(non_neighbors)), replace=False)
-                for i in range(len(selected_nodes) - 1):
-                    node1, node2 = selected_nodes[i], selected_nodes[i + 1]
-                    if not optimized_graph.has_edge(node1, node2):
-                        optimized_graph.add_edge(node1, node2, weight=2.0)
-                        applied_recommendations.append({
-                            'from': node1,
-                            'to': node2,
-                            'weight': 2.0,
-                            'reason': f'Mitigación cuello de botella: {critical_node}'
-                        })
+                # Crear múltiples conexiones para reducir dependencia
+                import random
+                selected_nodes = random.sample(non_neighbors, min(3, len(non_neighbors)))
+                
+                for i in range(len(selected_nodes)):
+                    for j in range(i + 1, len(selected_nodes)):
+                        node1, node2 = selected_nodes[i], selected_nodes[j]
+                        if not optimized_graph.has_edge(node1, node2) and not optimized_graph.has_edge(node2, node1):
+                            # Peso basado en la criticidad del cuello de botella
+                            mitigation_weight = bottleneck['criticality'] * 3
+                            optimized_graph.add_edge(node1, node2, weight=mitigation_weight)
+                            connections_added += 1
+                            applied_recommendations.append({
+                                'from': node1,
+                                'to': node2,
+                                'weight': mitigation_weight,
+                                'reason': f'Mitigación cuello de botella crítico: {critical_node}',
+                                'bottleneck_mitigation': True
+                            })
+                
+                bottlenecks_mitigated += 1
+        
+        # Adicionar conexiones basadas en análisis de componentes
+        components = list(nx.connected_components(optimized_graph.to_undirected()))
+        if len(components) > 1:
+            # Conectar componentes aislados
+            for i in range(len(components) - 1):
+                comp1 = list(components[i])
+                comp2 = list(components[i + 1])
+                
+                # Conectar nodos con mayor centralidad de cada componente
+                subgraph1 = optimized_graph.subgraph(comp1)
+                subgraph2 = optimized_graph.subgraph(comp2)
+                
+                # Encontrar nodos más centrales de cada componente
+                pr1 = nx.pagerank(subgraph1, weight='weight')
+                pr2 = nx.pagerank(subgraph2, weight='weight')
+                
+                central1 = max(pr1.items(), key=lambda x: x[1])[0]
+                central2 = max(pr2.items(), key=lambda x: x[1])[0]
+                
+                bridge_weight = 2.5  # Peso estándar para puentes entre componentes
+                optimized_graph.add_edge(central1, central2, weight=bridge_weight)
+                connections_added += 1
+                applied_recommendations.append({
+                    'from': central1,
+                    'to': central2,
+                    'weight': bridge_weight,
+                    'reason': 'Puente entre componentes desconectados',
+                    'component_bridge': True
+                })
         
         # Guardar grafo optimizado y calcular métricas
         self.optimized_graph = optimized_graph
@@ -257,12 +325,49 @@ class AINetworkOptimizer:
         # Guardar detalles de optimización
         self.optimization_results = {
             'applied_recommendations': applied_recommendations,
-            'bottlenecks_mitigated': len(bottlenecks[:2]),
+            'bottlenecks_mitigated': bottlenecks_mitigated,
             'new_connections': len([r for r in applied_recommendations if 'weight_increase' not in r]),
-            'reinforced_connections': len([r for r in applied_recommendations if 'weight_increase' in r])
+            'reinforced_connections': len([r for r in applied_recommendations if 'weight_increase' in r]),
+            'connections_added_total': connections_added,
+            'high_quality_recommendations_used': len(high_quality_recs[:top_recommendations]),
+            'optimization_effectiveness': self._calculate_optimization_effectiveness()
         }
         
         return optimized_graph
+    
+    def _calculate_optimization_effectiveness(self) -> Dict[str, float]:
+        """
+        Calcula la efectividad de la optimización
+        
+        Returns:
+            Métricas de efectividad
+        """
+        if self.original_metrics is None or self.optimized_metrics is None:
+            return {}
+        
+        effectiveness = {}
+        
+        # Cambios en métricas clave
+        density_change = self.optimized_metrics['density'] - self.original_metrics['density']
+        clustering_change = self.optimized_metrics['avg_clustering'] - self.original_metrics['avg_clustering']
+        reciprocity_change = self.optimized_metrics['reciprocity'] - self.original_metrics['reciprocity']
+        
+        # Score de efectividad (0-1)
+        density_score = min(1.0, max(0.0, density_change * 10))  # Normalizar cambio de densidad
+        clustering_score = min(1.0, max(0.0, clustering_change * 5))  # Normalizar cambio de clustering
+        reciprocity_score = min(1.0, max(0.0, reciprocity_change * 5))  # Normalizar cambio de reciprocidad
+        
+        overall_effectiveness = (density_score + clustering_score + reciprocity_score) / 3
+        
+        effectiveness = {
+            'density_improvement': density_change,
+            'clustering_improvement': clustering_change,
+            'reciprocity_improvement': reciprocity_change,
+            'overall_effectiveness_score': overall_effectiveness,
+            'connectivity_improvement': (self.optimized_metrics['num_edges'] - self.original_metrics['num_edges']) / self.original_metrics['num_edges']
+        }
+        
+        return effectiveness
     
     def _identify_bottlenecks_advanced(self, graph: nx.DiGraph) -> List[Dict[str, Any]]:
         """

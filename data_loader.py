@@ -3,7 +3,8 @@ import streamlit as st
 from typing import Optional
 
 @st.cache_data
-def load_and_process_data(file_path: str = "github_collaboration_data.csv") -> pd.DataFrame:
+def load_and_process_data(file_path: str = "github_collaboration_data_large.csv") -> pd.DataFrame:
+#def load_and_process_data(file_path: str = "github_collaboration_data.csv") -> pd.DataFrame:
     """
     Carga y procesa los datos de colaboración de GitHub
     

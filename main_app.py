@@ -447,7 +447,7 @@ def show_technical_leaders_classification(metrics, G, df, ai_optimizer):
     with col2:
         fig = px.bar(x=role_counts.index, y=role_counts.values,
                     title="Cantidad por Rol")
-        fig.update_xaxis(tickangle=45)
+        fig.update_layout(xaxis_tickangle=45)
         st.plotly_chart(fig, use_container_width=True)
     
     # Radar chart para top 5 desarrolladores
@@ -727,7 +727,43 @@ def show_before_after_analysis(G, df, ai_optimizer, visualizer):
     st.markdown('<h2 class="section-header">🔬 Análisis Comparativo Detallado: Antes/Después</h2>', unsafe_allow_html=True)
     
     if not st.session_state.get('optimization_applied', False):
-        st.warning("⚠️ Primero debe ejecutar la optimización en la sección '🤖 Optimización IA Completa'")
+        st.info("💡 Para ver la comparación detallada, primero ejecuta la optimización en la sección '🤖 Optimización IA Completa'")
+        
+        # NUEVA SECCIÓN: Mostrar métricas actuales mientras tanto
+        st.subheader("📊 Métricas Actuales de la Red")
+        current_metrics = calculate_detailed_metrics(G)
+        
+        col1, col2, col3, col4, col5 = st.columns(5)
+        with col1:
+            st.metric("🏘️ Nodos", current_metrics['num_nodes'])
+        with col2:
+            st.metric("🔗 Aristas", current_metrics['num_edges'])
+        with col3:
+            st.metric("📊 Densidad", f"{current_metrics['density']:.3f}")
+        with col4:
+            st.metric("🕸️ Clustering", f"{current_metrics['avg_clustering']:.3f}")
+        with col5:
+            st.metric("🔄 Reciprocidad", f"{current_metrics['reciprocity']:.3f}")
+        
+        # Mostrar tabla de centralidad actual
+        st.subheader("🏆 Rankings Actuales de Centralidad")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**Top 10 - PageRank:**")
+            pagerank_current = sorted(current_metrics['pagerank'].items(), key=lambda x: x[1], reverse=True)[:10]
+            pagerank_df = pd.DataFrame(pagerank_current, columns=['Desarrollador', 'PageRank'])
+            pagerank_df['Rango'] = range(1, len(pagerank_df) + 1)
+            st.dataframe(pagerank_df[['Rango', 'Desarrollador', 'PageRank']], use_container_width=True)
+        
+        with col2:
+            st.write("**Top 10 - Intermediación:**")
+            betweenness_current = sorted(current_metrics['betweenness_centrality'].items(), key=lambda x: x[1], reverse=True)[:10]
+            betweenness_df = pd.DataFrame(betweenness_current, columns=['Desarrollador', 'Intermediación'])
+            betweenness_df['Rango'] = range(1, len(betweenness_df) + 1)
+            st.dataframe(betweenness_df[['Rango', 'Desarrollador', 'Intermediación']], use_container_width=True)
+        
         return
     
     original_metrics = st.session_state['original_metrics']
@@ -900,7 +936,6 @@ def show_before_after_analysis(G, df, ai_optimizer, visualizer):
         impact_df.style.background_gradient(subset=['Impacto Total']),
         use_container_width=True
     )
-
 def show_general_overview(df, G, metrics):
     """Mostrar resumen general del análisis"""
     st.markdown('<h2 class="section-header">📈 Resumen General</h2>', unsafe_allow_html=True)
@@ -927,6 +962,35 @@ def show_general_overview(df, G, metrics):
         st.metric("🕸️ Clustering", f"{avg_clustering:.3f}")
     
     st.markdown("---")
+    
+    # NUEVA SECCIÓN: Tabla de datos del dataset
+    st.subheader("📋 Vista de Datos del Dataset")
+    st.dataframe(df.head(20), use_container_width=True)
+    
+    # NUEVA SECCIÓN: Estadísticas detalladas
+    st.subheader("📊 Estadísticas Detalladas")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**Por Desarrollador:**")
+        dev_stats = df.groupby('developer_source').agg({
+            'weight': 'sum',
+            'developer_target': 'count',
+            'repo': 'nunique'
+        }).rename(columns={
+            'weight': 'Peso Total',
+            'developer_target': 'Interacciones',
+            'repo': 'Repositorios'
+        }).head(10)
+        st.dataframe(dev_stats)
+    
+    with col2:
+        st.write("**Por Tipo de Interacción:**")
+        interaction_stats = df.groupby('interaction_type').agg({
+            'weight': ['count', 'sum', 'mean']
+        }).round(2)
+        interaction_stats.columns = ['Cantidad', 'Peso Total', 'Peso Promedio']
+        st.dataframe(interaction_stats)
     
     # Distribución de datos
     col1, col2 = st.columns(2)
@@ -993,7 +1057,6 @@ def show_general_overview(df, G, metrics):
             f"{reciprocity:.3f}",
             help="Grado de colaboraciones bidireccionales"
         )
-
 # Mantener las funciones existentes
 def show_ai_community_analysis(G, ai_community_detector, df, method):
     """Mostrar análisis de comunidades con IA"""
@@ -1027,6 +1090,53 @@ def show_ai_community_analysis(G, ai_community_detector, df, method):
         community_fig = ai_community_detector.visualize_communities()
         st.plotly_chart(community_fig, use_container_width=True)
         
+        # NUEVA SECCIÓN: Detalles de cada comunidad
+        st.subheader("📋 Detalles por Comunidad")
+        
+        community_details = {}
+        for node, comm_id in communities.items():
+            if comm_id not in community_details:
+                community_details[comm_id] = []
+            community_details[comm_id].append(node)
+        
+        for comm_id, members in community_details.items():
+            with st.expander(f"👥 Comunidad {comm_id} ({len(members)} miembros)"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write("**Miembros:**")
+                    # Obtener métricas si están disponibles
+                    try:
+                        from network_analyzer import NetworkAnalyzer
+                        analyzer = NetworkAnalyzer(G)
+                        metrics = analyzer.calculate_all_metrics()
+                        
+                        for member in members:
+                            pagerank_score = metrics.get('pagerank', {}).get(member, 0)
+                            st.write(f"• {member} (PR: {pagerank_score:.3f})")
+                    except:
+                        for member in members:
+                            st.write(f"• {member}")
+                
+                with col2:
+                    # Estadísticas de la comunidad
+                    comm_interactions = df[
+                        (df['developer_source'].isin(members)) | 
+                        (df['developer_target'].isin(members))
+                    ]
+                    
+                    st.metric("🔗 Interacciones Totales", len(comm_interactions))
+                    st.metric("📁 Repositorios", comm_interactions['repo'].nunique())
+                    
+                    if len(comm_interactions) > 0:
+                        st.metric("⚖️ Peso Promedio", f"{comm_interactions['weight'].mean():.2f}")
+                        
+                        # Mostrar repositorios más activos en esta comunidad
+                        top_repos = comm_interactions['repo'].value_counts().head(3)
+                        st.write("**Top Repositorios:**")
+                        for repo, count in top_repos.items():
+                            st.write(f"• {repo}: {count} interacciones")
+        
         # Optimización de comunidades
         st.subheader("🚀 Optimización de Comunidades")
         
@@ -1058,7 +1168,6 @@ def show_ai_community_analysis(G, ai_community_detector, df, method):
     except Exception as e:
         st.error(f"❌ Error en análisis de comunidades: {str(e)}")
         st.info("💡 Intenta con un método diferente o verifica las dependencias")
-
 def show_collaboration_patterns(ai_optimizer):
     """Mostrar patrones de colaboración detectados por IA"""
     st.markdown('<h2 class="section-header">📊 Patrones Colaborativos con IA</h2>', unsafe_allow_html=True)
